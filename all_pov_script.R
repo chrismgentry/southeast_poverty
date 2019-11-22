@@ -1,65 +1,9 @@
-library(cowplot) #needed for ggdraw
-library(geosphere) #probably don't need
-library(maps)
-library(maptools)
-library(readxl) #to add excel data
-library(rgdal)
-library(rgeos) #probably don't need to add
-library(sf)  #probably don't need
-library(sp)
-library(spatialreg) #new for spdep
-library(spdep) #spatial analysis
-library(stringr)
-library(viridis)  #probably don't need
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-
+packages<-c("cowplot", "dplyr", "geosphere", "ggplot2", "ggExtra", "maps", "maptools", "readxl", 
+            "rgdal", "rgeos", "sf", "sp", "spatialreg", "spdep", "stringr","tidyr", "viridis")
+sapply(packages, library, character.only=T)
 
 #The Data
-sapov <- read_excel("./Data/childpov18_satlantic.xlsx", 
-                    col_types = c("text", "text", "text", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric"))
-
-escpov <- read_excel("./Data/childpov18_esc.xlsx", 
-                     col_types = c("text", "text", "text", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric"))
-
-wscpov <- read.csv("./Data/childpov18_wsc.csv", 
-                   colClasses = c("character", "character", "character", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric", "numeric", 
-                                  "numeric", "numeric"))
-
-allpov <- read.csv("./Data/childpov18_southfull.csv", 
+se.data <- read.csv("./Data/childpov18_southfull.csv", 
                    colClasses = c("character", "character", "character", 
                                   "numeric", "numeric", "numeric", 
                                   "numeric", "numeric", "numeric", 
@@ -74,21 +18,20 @@ allpov <- read.csv("./Data/childpov18_southfull.csv",
                                   "numeric", "numeric"))
 
 #Format Variables
-names(allpov)[names(allpov)=="X2016.child.poverty"] <- "child.pov.2016"
-names(escpov)[names(escpov)=="2016 child poverty"] <- "child.pov.2016"
-names(sapov)[names(sapov)=="2016 child poverty"] <- "child.pov.2016"
-names(wscpov)[names(wscpov)=="X2016.child.poverty"] <- "child.pov.2016"
+names(se.data)[names(se.data)=="X2016.child.poverty"] <- "child.pov.2016"
+se.data$FIPS <- str_pad(se.data$FIPS, 5, "left", pad = 0)
+
+#create subsets
+satl.data <- subset(se.data, State %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"))
+esc.data <- subset(se.data, State %in% c("AL", "KY", "MS", "TN"))
+wsc.data <- subset(se.data, State %in% c("AR", "LA", "OK", "TX"))
 
 #creating counties from shapefiles
-SE.shape<-readOGR(dsn="./Shapefiles",layer="SE_Counties_2016")
-ESC.shape<-readOGR(dsn="./Shapefiles",layer="ESC_2016")
-SATL.shape<-readOGR(dsn="./Shapefiles",layer="SATL_2016")
-WSC.shape<-readOGR(dsn="./Shapefiles",layer="WSC_2016")
-
-#cleaning data and variables, subset not working
-allpov$FIPS <- str_pad(allpov$FIPS, 5, "left", pad = 0)
-WSC.shape@data <- WSC.shape@data[-c(6:54,57)]
-wsc.counties <- subset(WSC.shape@data, STATE_NAME == "Texas")
+se.shape<-readOGR(dsn="./Shapefiles",layer="SE_Counties_2016")
+se.shape@data <- se.shape@data[-c(6:54,57)]
+satl.shape <- subset(se.shape, State %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"))
+esc.shape <- subset(se.shape, State %in% c("AL", "KY", "MS", "TN"))
+wsc.shape <- subset(se.shape, State %in% c("AR", "LA", "OK", "TX"))
 
 #The FIPS 
 fips <- county.fips
