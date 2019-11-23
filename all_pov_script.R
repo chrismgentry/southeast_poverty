@@ -27,14 +27,20 @@ esc.data <- subset(se.data, State %in% c("AL", "KY", "MS", "TN"))
 wsc.data <- subset(se.data, State %in% c("AR", "LA", "OK", "TX"))
 
 #creating counties from shapefiles
-se.shape<-readOGR(dsn="./Shapefiles",layer="SE_Counties_2016")
-se.shape@data <- se.shape@data[-c(6:54,57)]
-satl.shape <- subset(se.shape, State %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"))
-esc.shape <- subset(se.shape, State %in% c("AL", "KY", "MS", "TN"))
-wsc.shape <- subset(se.shape, State %in% c("AR", "LA", "OK", "TX"))
+se.shape<-readOGR(dsn="./Shapefiles",layer="SE_Counties_2016", stringsAsFactors = FALSE)
+se.shape@data <- se.shape@data[-c(6:54,57:63)]
+names(se.shape@polygons) <- se.shape@data$FIPS
+satl.shape <- subset(se.shape, STATE_NAME %in% c("Delaware", "District of Columbia", "Florida", 
+                                                 "Georgia", "Maryland", "North Carolina", "South Carolina",
+                                                 "Virginia", "West Virginia"))
+esc.shape <- subset(se.shape, STATE_NAME %in% c("Alabama", "Kentucky", "Mississippi",
+                                           "Tennessee"))
+wsc.shape <- subset(se.shape, STATE_NAME %in% c("Arkansas", "Louisiana", "Oklahoma",
+                                           "Texas"))
 
 #The FIPS 
 fips <- county.fips
+fips$fips <- str_pad(fips$fips, 5, "left", pad = 0)
 
 #The Polygons
 world <- map_data("world")
@@ -44,8 +50,7 @@ counties <- map_data("county")
 #The Join
 counties$polyname <- paste(counties$region, counties$subregion, sep = ",")
 counties <- counties %>% left_join(fips, by = c("polyname" = "polyname"))
-counties$fips <- as.character(counties$fips)
-counties <- counties %>% left_join(allpov, by = c("fips" = "FIPS"))
+counties <- counties %>% left_join(se.data, by = c("fips" = "FIPS"))
 
 #Subsets
 southern_states <- subset(states, region %in% 
@@ -61,61 +66,193 @@ southern_counties <- subset(counties, region %in%
                                 "south carolina", "tennessee", "oklahoma", 
                                 "kentucky", "west virginia", "virginia", 
                                 "maryland", "delaware", "district of columbia"))
-subset <- c("texas", "arkansas", "louisiana", "mississippi", 
-            "alabama", "georgia", "florida", "north carolina",
-            "south carolina", "tennessee", "oklahoma", 
-            "kentucky", "west virginia", "virginia", 
-            "maryland", "delaware", "district of columbia")
-
-#Get FIPs
-all_counties <- map(database = "county", region = subset, fill=T, plot=F)
-all_IDs <- gsub(".*,","",all_counties$names)
-fips.codes <- separate(data = fips, col = polyname, into = c("state", "county"), sep = ",")
-county_IDs <- fips.codes$fips
-county_names <- fips.codes$county
-unique_IDs <- unique(county_IDs)
-
-#create polygons
-counties_sp <- map2SpatialPolygons(all_counties,
-                                   all_IDs,
-                                   CRS("+proj=longlat"),
-                                   checkHoles = FALSE)
-s#names(counties_sp@polygons) <- all_IDs
 
 #Create neighbors
-county.neighb.data<-poly2nb(counties_sp, queen=T)
-names(neighb.data) <- names(counties_sp@polygons)
+se.neighbors<-poly2nb(se.shape, queen=T, row.names = se.shape$FIPS)
+names(se.neighbors) <- names(se.shape$FIPS)
 
 #Create list of neighbors
-county.neighb.list<-nb2listw(county.neighb.data,style="W", zero.policy = TRUE) #, row.names(names(neighb.data))
+se.neighbors.list<-nb2listw(se.neighbors, style="W", zero.policy = TRUE, 
+                            row.names(names(se.neighbors)))
 
 #Create xy for all counties
-county.xy<-centroid(counties_sp)
-#? rownames(county.xy)<-county_IDs centroid id /= xy
-colnames(all.xy)<-cbind("x","y")
+county.xy<-centroid(se.shape)
+colnames(county.xy)<-cbind("x","y")
+# esc.xy<-centroid(esc.shape)
+# colnames(esc.xy)<-cbind("x","y")
+# satl.xy<-centroid(satl.shape)
+# colnames(satl.xy)<-cbind("x","y")
+# wsc.xy<-centroid(wsc.shape)
+# colnames(wsc.xy)<-cbind("x","y")
 
 #Create distance centroid
-county.dist.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
+county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
+# esc.k5 <-knn2nb(knearneigh(esc.xy, k=5, longlat = TRUE))
+# satl.k2 <-knn2nb(knearneigh(satl.xy, k=2, longlat = TRUE))
+# wsc.k1 <-knn2nb(knearneigh(wsc.xy, k=1, longlat = TRUE))
 
 #Determine max k distance value
-county.max.k1 <-max(unlist(nbdists(county.dist.k1, county.xy, longlat=TRUE)))
+county.max.k1 <-max(unlist(nbdists(county.k1, county.xy, longlat=TRUE)))
+# esc.max.k5 <-max(unlist(nbdists(esc.k5, esc.xy, longlat=TRUE)))
+# satl.max.k2 <-max(unlist(nbdists(satl.k2, satl.xy, longlat=TRUE)))
+# wsc.max.k1 <-max(unlist(nbdists(wsc.k1, wsc.xy, longlat=TRUE)))
 
 #Calculate neighbors based on distance
-county.sp.dist.k1 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k1, longlat = TRUE)
+county.dist.k1 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k1, longlat = TRUE)
+# esc.dist.k5 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k5, longlat = TRUE)
+# satl.dist.k2 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k2, longlat = TRUE)
+# wsc.dist.k1 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k1, longlat = TRUE)
 
 #Create neighbor list
-county.dist.neighb.k1 <-nb2listw(county.sp.dist.k1,style="W", zero.policy = TRUE)
+county.k1.neighbors <-nb2listw(county.dist.k1, style="W", zero.policy = TRUE)
+# esc.k5.neighbors <-nb2listw(esc.dist.k5, style="W", zero.policy = TRUE)
+# satl.k2.neighbors <-nb2listw(satl.dist.k2, style="W", zero.policy = TRUE)
+# wsc.k1.neighbors <-nb2listw(wsc.dist.k1, style="W", zero.policy = TRUE)
 
-#spatial ERROR regression model based on distance
-county.dist.err.k1 <-errorsarlm(child.pov.2016 ~ rural + urban + lnmanufacturing + lnag + lnretail + lnhealthss + lnconstruction + lnlesshs + lnunemployment + lnsinglemom + lnblack + lnhispanic + lnuninsured + lnincome_ratio + lnteenbirth + lnunmarried, data = allpov, listw = county.dist.neighb.k1)
-summary(all.dist.err.k1)
+#Creating the equation
+equation <- child.pov.2016 ~ rural + urban + lnmanufacturing + lnag + 
+  lnretail + lnhealthss + lnconstruction + lnlesshs + lnunemployment + 
+  lnsinglemom + lnblack + lnhispanic + lnuninsured + lnincome_ratio + 
+  lnteenbirth + lnunmarried
 
-all.r2 <- summary(all.dist.err.k1, correlation=TRUE, Nagelkerke = TRUE)
+options(scipen = 5)
 
+#OLS
+ols <- lm(equation, data=se.data)
+summary(ols)
 
-##############################################################
-if (rgeosStatus()) {
-  all_counties <- unionSpatialPolygons(all_counties, IDs = all_counties$names)
-  }
+#Morans Test
+# cont.morans <- lm.morantest(ols, se.neighbors.list)
+# cont.morans, did not produce significant results
+dist.morans <- lm.morantest(ols, county.k1.neighbors)
+dist.morans
 
-counties %>% group_by(County_Name) %>% summarize(count=n())
+#LaGrange Multiplier
+# cont.lm.tests <- lm.LMtests(ols, se.neighbors.list, test="all")
+# cont.lm.tests, did not produce significant results
+dist.lm.tests <- lm.LMtests(ols, county.k1.neighbors, test="all")
+dist.lm.tests
+
+#Distance Lag Model
+dist.lag.model <- spatialreg::lagsarlm(equation, data=se.data, 
+                                       county.k1.neighbors)
+dist.lag.summary <- summary(dist.lag.model, Nagelkerke = TRUE)
+
+dist.lag.data <- cbind.data.frame(se.data$FIPS,
+                                  dist.lag.summary$fitted.values,
+                                  dist.lag.summary$residual,
+                                  se.data$child.pov.2016,
+                                  se.data$urban,
+                                  se.data$lnretail,
+                                  se.data$lnhealthss,
+                                  se.data$lnconstruction,
+                                  se.data$lnlesshs,
+                                  se.data$lnunemployment,
+                                  se.data$lnsinglemom, 
+                                  se.data$lnhispanic,
+                                  se.data$lnuninsured, 
+                                  se.data$lnincome_ratio,
+                                  se.data$lnunmarried,
+                                    stringsAsFactors = FALSE)
+
+#Renaming columns
+colnames(dist.lag.data) <- c("fips","fitted","resid","childpov", "urban","retail",
+                               "healthcare","construction","less_hs","unemployed",
+                               "single_mom","hispanic","uninsured","income_ratio","unmarried")
+
+#quantiles
+quantiles_fit <- dist.lag.data %>%
+  pull(fitted) %>%
+  quantile(probs = seq(0, 1, length.out = 4), na.rm = TRUE)
+
+quantiles_pov <- dist.lag.data %>%
+  pull(childpov) %>%
+  quantile(probs = seq(0, 1, length.out = 4), na.rm = TRUE)
+
+#ranks
+fit_rank <- cut(dist.lag.data$fitted, 
+               breaks= quantiles_fit, 
+               labels=c("1", "2", "3"), 
+               na.rm = TRUE, 
+               include.lowest = TRUE)
+
+pov_rank <- cut(dist.lag.data$childpov, 
+                breaks= quantiles_pov, 
+                labels=c("1", "2", "3"), 
+                na.rm = TRUE,
+                include.lowest = TRUE)
+
+#Join ranks and combined column to dataset
+dist.lag.data$fit_score <- as.numeric(fit_rank)
+dist.lag.data$pov_score <- as.numeric(pov_rank)
+dist.lag.data$fit_pov <- paste(as.numeric(dist.lag.data$fit_score), 
+                                 "-", 
+                                 as.numeric(dist.lag.data$pov_score))
+
+#legend
+legend_colors <- tibble(
+  x = c(3,2,1,3,2,1,3,2,1),
+  y = c(3,3,3,2,2,2,1,1,1),
+  z = c("#574249", "#627f8c", "#64acbe", "#985356", "#ad9ea5", "#b0d5df", "#c85a5a", "#e4acac", "#e8e8e8"))
+
+xlabel <- "Modeled,Low \u2192 High"
+xlabel <- gsub(",", "\n", xlabel)
+ylabel <- "Observed,Low \u2192 High"
+ylabel <- gsub(",", "\n", ylabel)
+
+legend <- ggplot(legend_colors, aes(x,y)) + 
+  geom_tile(aes(fill=z)) + 
+  theme_minimal() + theme(legend.position = "none") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  labs(x = xlabel, y = ylabel) + 
+  scale_fill_identity() +
+  ggtitle("Legend") +
+  theme(axis.title.y = element_text(face = "italic", hjust = 0.5, size = 8)) +
+  theme(axis.title.x = element_text(face = "italic", hjust = 0.5, size = 8)) +
+  theme(plot.title = element_text(face="bold", hjust = 0.5, size = 10))
+
+#attach data to counties
+county.data <- southern_counties %>% 
+  left_join(dist.lag.data, by = c("fips" = "fips")) %>% fortify
+
+#attach colors
+bivariate_color_scale <- tibble(
+  "3 - 3" = "#574249", 
+  "2 - 3" = "#627f8c",
+  "1 - 3" = "#64acbe",
+  "3 - 2" = "#985356",
+  "2 - 2" = "#ad9ea5",
+  "1 - 2" = "#b0d5df",
+  "3 - 1" = "#c85a5a",
+  "2 - 1" = "#e4acac",
+  "1 - 1" = "#e8e8e8") %>%
+  gather("group", "fill")
+
+county.data <- county.data %>% 
+  left_join(bivariate_color_scale, by = c("fit_pov" = "group"))
+
+#fit map
+fit_pov_map <- ggplot() + 
+  geom_polygon(data = world, aes(x=long,y=lat, group=group), fill = "gray95", color = "gray30") +
+  geom_polygon(data = states, aes(x=long,y=lat, group=group), fill = "gray", color = "gray30") +
+  geom_polygon(data = county.data, aes(x=long, y=lat, group=group, fill = fill)) + 
+  geom_polygon(data = southern_counties, aes(x=long,y=lat, group=group), fill = NA, color = "black", size = 0.05) +
+  geom_polygon(data = southern_states, aes(x=long,y=lat, group=group), fill = NA, color = "white") +
+  coord_map("conic", lat0 = 30, xlim=c(-106,-77), ylim=c(24.5,40.5)) +
+  scale_fill_identity() +
+  theme_grey() + theme(legend.position="bottom") + theme(legend.title.align=0.5) +
+  theme(panel.background = element_rect(fill = 'deepskyblue'),
+        panel.grid.major = element_line(colour = NA)) +
+  labs(x = "Longitude", y = "Latitude", fill = "Child Poverty", 
+       title = "Bivariate Map of Observed vs Modeled Poverty Values") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+#final map
+final_map <- ggdraw() +
+  draw_plot(fit_pov_map, x = 0, y = 0, width = 1, height = 1) +
+  draw_plot(legend, x = 0.55, y = 0.075, width = 0.15, height = 0.25) 
+final_map

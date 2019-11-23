@@ -1,0 +1,377 @@
+---
+title: Analysis of Southern Poverty <br><small>An Examination with Spatial Regression</small></br>
+author: "Dr. Trevor Brooks and Dr. Christopher Gentry"
+output:
+  html_notebook:
+    df_print: paged
+    highlight: breezedark
+    number_sections: yes
+    rows.print: 10
+    theme: cosmo
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+  html_document:
+    df_print: paged
+    toc: yes
+  pdf_document: default
+editor_options:
+  chunk_output_type: inline
+---
+<style type="text/css">
+
+h1.title {
+  font-size: 40px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkBlue;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+  font-size: 20px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkBlue;
+  text-align: center;
+}
+</style>
+
+# Packages used in this project
+
+There are several specialty packages that will be used in this project due to the specific nature of the analyses. Some of these packages you will need to install while several others you may already have installed.
+
+<p align="center">
+|```cowplot``` | ```dplyr``` | ```geosphere``` | ```ggplot2``` | ```ggExtra``` | ```maps``` | <br></br> | ```maptools``` | ```readxl``` | ```rgdal``` | ```rgeos``` | ```sf``` | ```sp``` | <br></br> |```spatialreg``` | ```spdep``` | ```stringr``` | ```tidyr``` | ```viridis```|
+</p>
+
+To begin, we will install the following:
+```{r Packages, message=FALSE, warning=FALSE, results='hide'}
+packages<-c("cowplot", "dplyr", "geosphere", "ggplot2", "ggExtra", "maps", "maptools", "readxl", "rgdal", "rgeos", "sf", "sp", "spatialreg", "spdep", "stringr","tidyr", "viridis")
+sapply(packages, require, character.only=T)
+```
+
+> You can change **library**, in the line of script above that begins with ```sapply```, to **install.packages** so that it reads ```sapply(packages, install.packages, character.only=T)``` and it will install all of the necessary packages. Then you can revert back to **library** to load them. 
+
+# Introduction to the data
+This data, collected by Dr. Brooks, examines the effect of numerous socioeconomic factors as they relate to the percentage of children under the age of 18 who are living below the poverty line in the Southern United States. The data was collected from the U.S. Census Bureau, American Community Survey, Bureau of Labor Force Statistics, U.S. Department of Agriculture Economic Research Service, and the County Health Rankings. Independent variables include: rural, urban, manufacturing, agriculture, retail, healthcare, construction, less than high school degree, unemployment, income ratio, teen birth, unmarried, single mother, uninsured, as well as Black and Hispanic race variables. The data is stored as a comma delimited file and can be found in the *data folder* of this project [repository](https://github.com/chrismgentry/southeast_poverty). To load the data we will use the following script to ensure all of the data is appropriately formatted.
+
+```{r Data, messages=FALSE, warning=FALSE}
+se.data <- read.csv("./Data/childpov18_southfull.csv", 
+                   colClasses = c("character", "character", "character", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric", "numeric", 
+                                  "numeric", "numeric"))
+
+#rormat variables
+names(se.data)[names(se.data)=="X2016.child.poverty"] <- "child.pov.2016"
+se.data$FIPS <- str_pad(se.data$FIPS, 5, "left", pad = 0)
+```
+
+In the formatting portion, a "0" was added to each FIPS code that was only 4-digits in length creating a 5-digit code with a preceding 0.
+
+using this primary dataset, we can create subsets for each of the regions represented include the South Atlantic, East South Central, and West South Central states.
+
+```{r Data Subsets, message=FALSE, warning=FALSE}
+#create subsets
+satl.data <- subset(se.data, State %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"))
+esc.data <- subset(se.data, State %in% c("AL", "KY", "MS", "TN"))
+wsc.data <- subset(se.data, State %in% c("AR", "LA", "OK", "TX"))
+```
+
+Next, we import shapefiles from an ESRI dataset to use as the basemap for the region. I attempted to use a dataset from R however, the number of counties did not match the number of counties in the \*.csv file so we resorted to an external data source. These shapefiles can be found in the *shapefiles folder* of the project [repository](https://github.com/chrismgentry/southeast_poverty).
+
+```{r Polygon Subsets, message=FALSE, warning=FALSE, results='hide'}
+#creating counties from shapefiles
+se.shape<-readOGR(dsn="./Shapefiles",layer="SE_Counties_2016", stringsAsFactors = FALSE)
+se.shape@data <- se.shape@data[-c(6:54,57:63)]
+names(se.shape@polygons) <- se.shape@data$FIPS
+
+#create subsets
+satl.shape <- subset(se.shape, STATE_NAME %in% c("Delaware", "District of Columbia", "Florida", "Georgia", "Maryland", "North Carolina", "South Carolina", "Virginia", "West Virginia"))
+esc.shape <- subset(se.shape, STATE_NAME %in% c("Alabama", "Kentucky", "Mississippi", "Tennessee"))
+wsc.shape <- subset(se.shape, STATE_NAME %in% c("Arkansas", "Louisiana", "Oklahoma", "Texas"))
+
+```
+
+Because this shapefile had extraneous data, we removed several columns and set polygons names as the FIPS codes for each county. Additionall, we created subsets for each of the three regions.
+
+# Spatial Regression
+
+For this analysis we will:
+
+1. Expore the data using OLS
+2. Determine the presence of autocorrelation using Moran's and LaGrange Multipliers
+3. Create spatial weights based on contiguity and distance for the full dataset as well as the separate regions
+4. Run various spatial models to determine the most appropriate analysis
+5. Create a bivariate map of the results
+
+We will try to use straight-forward naming conventions to easily keep track of the data and specific analyses.
+
+# Creating Spatial Weights
+
+In order to determine if there is any underlaying spatial relationships in our data we can run a various tests, however, in order to do this we need to provide a spatial weights matrix. These spatial weights can be based on *contiguity* (common neighbors) or *distance* (k-nearest neighbors).
+
+```{r Spatial Weights Matrix, message=FALSE, warning=FALSE}
+#Create contiguity neighbors
+se.neighbors<-poly2nb(se.shape, queen=T, row.names = se.shape$FIPS)
+names(se.neighbors) <- names(se.shape$FIPS)
+
+#Create list of neighbors based on contiguity
+se.neighbors.list<-nb2listw(se.neighbors, style="W", zero.policy = TRUE, 
+                            row.names(names(se.neighbors)))
+
+#Create xy for all counties for distance weights
+county.xy<-centroid(se.shape)
+colnames(county.xy)<-cbind("x","y")
+
+#Create distance centroid for the k=1 nearest neighbor
+county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
+
+#Determine max k distance value for nearest neighbor
+county.max.k1 <-max(unlist(nbdists(county.k1, county.xy, longlat=TRUE)))
+
+#Calculate neighbors based on max k=1 distance
+county.dist.k1 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k1, longlat = TRUE)
+
+#Create neighbor list for each county based on k=1 distance
+county.k1.neighbors <-nb2listw(county.dist.k1, style="W", zero.policy = TRUE)
+```
+
+With both the contiguity and distance weights created, we can now move on with the analyses. To begin with, we will determine if the model variables have any ability to explain child poverty in the southern United States by using an OLS.
+
+To make further analyses easier, we can create an object that contains the equation. Additionally, to make reading the results easier, we will change the scientific notation to five significant digits,
+
+```{r Equation, message=FALSE, warning=FALSE}
+#Creating the equation
+equation <- child.pov.2016 ~ rural + urban + lnmanufacturing + lnag + 
+  lnretail + lnhealthss + lnconstruction + lnlesshs + lnunemployment + 
+  lnsinglemom + lnblack + lnhispanic + lnuninsured + lnincome_ratio + 
+  lnteenbirth + lnunmarried
+
+#scientific notation
+options(scipen = 5)
+```
+
+# OLS
+
+```{r}
+ols <- lm(equation, data=se.data)
+summary(ols)
+```
+
+From the OLS we can see not only are there a number of significant variables but the model itself is significant with a r<sup>2</sup> value of 0.64. To test for spatial dependency in the residuals we can run a Global Moran's I. This requires that we include the spatial weights matrix in the analysis.
+
+```{r Morans Contiguity, message=FALSE, warning=FALSE}
+#Morans test, distance based on contiguity
+cont.morans <- lm.morantest(ols, se.neighbors.list)
+cont.morans
+```
+
+```{r Morans Distance, message=FALSE, warning=FALSE}
+#Morans test, distance based on distance
+dist.morans <- lm.morantest(ols, county.k1.neighbors)
+dist.morans
+```
+
+From the analysis above, we can conclude there is some spatial autocorrelation in the residuals when we use the distance model. However, we can also use LaGrange Multipliers to assist with model selection.
+
+```{r LM for Contiguity, message=FALSE, warning=FALSE}
+#LaGrange Multiplier
+cont.lm.tests <- lm.LMtests(ols, se.neighbors.list, test="all")
+cont.lm.tests
+```
+
+From the LM tests for contiguity we can see there is no spatial autocorrelation in the models. So next we can run LM tests for the distance matrix.
+
+```{r LM for Distance, message=FALSE, warning=FALSE}
+dist.lm.tests <- lm.LMtests(ols, county.k1.neighbors, test="all")
+dist.lm.tests
+```
+
+Following this analysis, we can see that there is spatial dependencies in the spatial error (```r dist.lm.tests[["LMerr"]][["p.value"]]```) and spatial lag (```r dist.lm.tests[["LMlag"]][["p.value"]]```) models. When comparing the two, the spatial lag distance model has a much smaller p-value and therefore should result in the best model for the data.
+
+# Spatial Lag Model with Distance Weights (k-nearest neighbors)
+
+Continuing the analysis using the distance lag model, we can examine the results of the new model.
+
+```{r Dist Lag Model, message=FALSE, warning=FALSE}
+dist.lag.model <- spatialreg::lagsarlm(equation, data=se.data, 
+                                       county.k1.neighbors)
+dist.lag.summary <- summary(dist.lag.model, Nagelkerke = TRUE)
+dist.lag.summary
+```
+
+Similar to the OLS, we can see that there are a number of significant variables. Additionally, the model has a pseudo r<sup>2</sup> of 0.64546 and a p-value of ```r dist.lag.summary[["LR1"]][["p.value"]]```. To examine the results of the Distance Lag Model, we can create a bivariate map to examine the modeled values versus the predicted values.
+
+# Mapping the Data
+
+Because there is no built-in function for creating bivariate maps, we will need to create a number of custom object. So a brief description will precede each step below, but specific details can be found in the [Spatial Regression](https://chrismgentry.github.io/Spatial-Regression/) exercise created for the Advanced Data Analytics course.
+
+To begin making the map we will need to combine data from the original dataset with results from the model.
+
+```{r Combine the data, warning=FALSE, message=FALSE}
+dist.lag.data <- cbind.data.frame(se.data$FIPS,
+                                  dist.lag.summary$fitted.values,
+                                  dist.lag.summary$residual,
+                                  se.data$child.pov.2016,
+                                  se.data$urban,
+                                  se.data$lnretail,
+                                  se.data$lnhealthss,
+                                  se.data$lnconstruction,
+                                  se.data$lnlesshs,
+                                  se.data$lnunemployment,
+                                  se.data$lnsinglemom, 
+                                  se.data$lnhispanic,
+                                  se.data$lnuninsured, 
+                                  se.data$lnincome_ratio,
+                                  se.data$lnunmarried,
+                                    stringsAsFactors = FALSE)
+
+#Renaming columns
+colnames(dist.lag.data) <- c("fips","fitted","resid","childpov", "urban","retail", "healthcare","construction","less_hs","unemployed", "single_mom","hispanic","uninsured","income_ratio","unmarried")
+```
+
+Next we need to break the variables we want to map, in this case the actual and predicted values, in to quantiles and rank each value to create a scale.
+
+```{r Breaks, warning=FALSE, message=FALSE}
+#quantiles
+quantiles_fit <- dist.lag.data %>%
+  pull(fitted) %>%
+  quantile(probs = seq(0, 1, length.out = 4), na.rm = TRUE)
+
+quantiles_pov <- dist.lag.data %>%
+  pull(childpov) %>%
+  quantile(probs = seq(0, 1, length.out = 4), na.rm = TRUE)
+
+#ranks
+fit_rank <- cut(dist.lag.data$fitted, 
+               breaks= quantiles_fit, 
+               labels=c("1", "2", "3"), 
+               na.rm = TRUE, 
+               include.lowest = TRUE)
+
+pov_rank <- cut(dist.lag.data$childpov, 
+                breaks= quantiles_pov, 
+                labels=c("1", "2", "3"), 
+                na.rm = TRUE,
+                include.lowest = TRUE)
+
+#Join ranks and combined column to dataset
+dist.lag.data$fit_score <- as.numeric(fit_rank)
+dist.lag.data$pov_score <- as.numeric(pov_rank)
+dist.lag.data$fit_pov <- paste(as.numeric(dist.lag.data$fit_score), 
+                                 "-", 
+                                 as.numeric(dist.lag.data$pov_score))
+```
+
+We will need to build a custom legend for this map that includes custom labels.
+
+```{r}
+#legend
+legend_colors <- tibble(
+  x = c(3,2,1,3,2,1,3,2,1),
+  y = c(3,3,3,2,2,2,1,1,1),
+  z = c("#574249", "#627f8c", "#64acbe", "#985356", "#ad9ea5", "#b0d5df", "#c85a5a", "#e4acac", "#e8e8e8"))
+
+xlabel <- "Modeled,Low \u2192 High"
+xlabel <- gsub(",", "\n", xlabel)
+ylabel <- "Observed,Low \u2192 High"
+ylabel <- gsub(",", "\n", ylabel)
+
+legend <- ggplot(legend_colors, aes(x,y)) + 
+  geom_tile(aes(fill=z)) + 
+  theme_minimal() + theme(legend.position = "none") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor =element_blank())+   theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  labs(x = xlabel, y = ylabel) + 
+  scale_fill_identity() +
+  ggtitle("Legend") +
+  theme(axis.title.y = element_text(face = "italic", hjust = 0.5, size = 8)) +
+  theme(axis.title.x = element_text(face = "italic", hjust = 0.5, size = 8)) +
+  theme(plot.title = element_text(face="bold", hjust = 0.5, size = 10))
+```
+
+We will also need to join the data with the county polygons and attach the color codes for each ranked value.
+
+```{r data match, warning=FALSE, message=FALSE}
+#attach data to counties
+county.data <- southern_counties %>% 
+  left_join(dist.lag.data, by = c("fips" = "fips")) %>% fortify
+
+#attach colors
+bivariate_color_scale <- tibble(
+  "3 - 3" = "#574249", 
+  "2 - 3" = "#627f8c",
+  "1 - 3" = "#64acbe",
+  "3 - 2" = "#985356",
+  "2 - 2" = "#ad9ea5",
+  "1 - 2" = "#b0d5df",
+  "3 - 1" = "#c85a5a",
+  "2 - 1" = "#e4acac",
+  "1 - 1" = "#e8e8e8") %>%
+  gather("group", "fill")
+
+county.data <- county.data %>% 
+  left_join(bivariate_color_scale, by = c("fit_pov" = "group"))
+```
+
+We are now ready to create the map. Because we want the map to have certain cartographic qualities we need to obtain additional base layers and create the map.
+
+```{r fitted map, warning=FALSE, message=FALSE}
+#The FIPS 
+fips <- county.fips
+fips$fips <- str_pad(fips$fips, 5, "left", pad = 0)
+
+#The Polygons
+world <- map_data("world")
+states <- map_data("state")
+counties <- map_data("county")
+
+#The Join
+counties$polyname <- paste(counties$region, counties$subregion, sep = ",")
+counties <- counties %>% left_join(fips, by = c("polyname" = "polyname"))
+counties <- counties %>% left_join(se.data, by = c("fips" = "FIPS"))
+
+#Subsets
+southern_states <- subset(states, region %in% 
+                            c("texas", "arkansas", "louisiana", "mississippi", 
+                              "alabama", "georgia", "florida", "north carolina", "south carolina", "tennessee", "oklahoma", "kentucky", "west virginia", "virginia", "maryland", "delaware", "district of columbia"))
+
+southern_counties <- subset(counties, region %in% 
+                              c("texas", "arkansas", "louisiana", "mississippi", "alabama", "georgia", "florida", "north carolina", "south carolina", "tennessee", "oklahoma", "kentucky", "west virginia", "virginia", "maryland", "delaware", "district of columbia"))
+
+#fit map
+fit_pov_map <- ggplot() + 
+  geom_polygon(data = world, aes(x=long,y=lat, group=group), fill = "gray95", color = "gray30") +
+  geom_polygon(data = states, aes(x=long,y=lat, group=group), fill = "gray", color = "gray30") +
+  geom_polygon(data = county.data, aes(x=long, y=lat, group=group, fill = fill)) + 
+  geom_polygon(data = southern_counties, aes(x=long,y=lat, group=group), fill = NA, color = "black", size = 0.05) +
+  geom_polygon(data = southern_states, aes(x=long,y=lat, group=group), fill = NA, color = "white") +
+  coord_map("conic", lat0 = 30, xlim=c(-106,-77), ylim=c(24.5,40.5)) +
+  scale_fill_identity() +
+  theme_grey() + theme(legend.position="bottom") + theme(legend.title.align=0.5) +
+  theme(panel.background = element_rect(fill = 'deepskyblue'),
+        panel.grid.major = element_line(colour = NA)) +
+  labs(x = "Longitude", y = "Latitude", fill = "Child Poverty", 
+       title = "Bivariate Map of Observed vs Modeled Poverty Values") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+And finally, we can combined the final map and the legend to create the final output.
+
+```{r final map, message=FALSE, warning=FALSE, fig.height = 6, fig.width = 8}
+#final map
+final_map <- ggdraw() +
+  draw_plot(fit_pov_map, x = 0, y = 0, width = 1, height = 1) +
+  draw_plot(legend, x = 0.55, y = 0.12, width = 0.15, height = 0.25) 
+final_map
+```
