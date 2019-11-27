@@ -70,44 +70,55 @@ southern_counties <- subset(counties, region %in%
 #Create neighbors
 se.neighbors<-poly2nb(se.shape, queen=T, row.names = se.shape$FIPS)
 names(se.neighbors) <- names(se.shape$FIPS)
+esc.neighbors<-poly2nb(esc.shape, queen=T, row.names = esc.shape$FIPS)
+names(esc.neighbors) <- names(esc.shape$FIPS)
+satl.neighbors<-poly2nb(satl.shape, queen=T, row.names = satl.shape$FIPS)
+names(satl.neighbors) <- names(satl.shape$FIPS)
+wsc.neighbors<-poly2nb(wsc.shape, queen=T, row.names = wsc.shape$FIPS)
+names(wsc.neighbors) <- names(wsc.shape$FIPS)
 
 #Create list of neighbors
 se.neighbors.list<-nb2listw(se.neighbors, style="W", zero.policy = TRUE, 
                             row.names(names(se.neighbors)))
-
+esc.neighbors.list<-nb2listw(esc.neighbors, style="W", zero.policy = TRUE, 
+                            row.names(names(esc.neighbors)))
+satl.neighbors.list<-nb2listw(satl.neighbors, style="W", zero.policy = TRUE, 
+                            row.names(names(satl.neighbors)))
+wsc.neighbors.list<-nb2listw(wsc.neighbors, style="W", zero.policy = TRUE, 
+                            row.names(names(wsc.neighbors)))
 #Create xy for all counties
 county.xy<-centroid(se.shape)
 colnames(county.xy)<-cbind("x","y")
-# esc.xy<-centroid(esc.shape)
-# colnames(esc.xy)<-cbind("x","y")
-# satl.xy<-centroid(satl.shape)
-# colnames(satl.xy)<-cbind("x","y")
-# wsc.xy<-centroid(wsc.shape)
-# colnames(wsc.xy)<-cbind("x","y")
+esc.xy<-centroid(esc.shape)
+colnames(esc.xy)<-cbind("x","y")
+satl.xy<-centroid(satl.shape)
+colnames(satl.xy)<-cbind("x","y")
+wsc.xy<-centroid(wsc.shape)
+colnames(wsc.xy)<-cbind("x","y")
 
 #Create distance centroid
 county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
-# esc.k5 <-knn2nb(knearneigh(esc.xy, k=5, longlat = TRUE))
-# satl.k2 <-knn2nb(knearneigh(satl.xy, k=2, longlat = TRUE))
-# wsc.k1 <-knn2nb(knearneigh(wsc.xy, k=1, longlat = TRUE))
+esc.k5 <-knn2nb(knearneigh(esc.xy, k=5, longlat = TRUE))
+satl.k2 <-knn2nb(knearneigh(satl.xy, k=2, longlat = TRUE))
+wsc.k1 <-knn2nb(knearneigh(wsc.xy, k=1, longlat = TRUE))
 
 #Determine max k distance value
 county.max.k1 <-max(unlist(nbdists(county.k1, county.xy, longlat=TRUE)))
-# esc.max.k5 <-max(unlist(nbdists(esc.k5, esc.xy, longlat=TRUE)))
-# satl.max.k2 <-max(unlist(nbdists(satl.k2, satl.xy, longlat=TRUE)))
-# wsc.max.k1 <-max(unlist(nbdists(wsc.k1, wsc.xy, longlat=TRUE)))
+esc.max.k5 <-max(unlist(nbdists(esc.k5, esc.xy, longlat=TRUE)))
+satl.max.k2 <-max(unlist(nbdists(satl.k2, satl.xy, longlat=TRUE)))
+wsc.max.k1 <-max(unlist(nbdists(wsc.k1, wsc.xy, longlat=TRUE)))
 
 #Calculate neighbors based on distance
 county.dist.k1 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k1, longlat = TRUE)
-# esc.dist.k5 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k5, longlat = TRUE)
-# satl.dist.k2 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k2, longlat = TRUE)
-# wsc.dist.k1 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k1, longlat = TRUE)
+esc.dist.k5 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k5, longlat = TRUE)
+satl.dist.k2 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k2, longlat = TRUE)
+wsc.dist.k1 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k1, longlat = TRUE)
 
 #Create neighbor list
 county.k1.neighbors <-nb2listw(county.dist.k1, style="W", zero.policy = TRUE)
-# esc.k5.neighbors <-nb2listw(esc.dist.k5, style="W", zero.policy = TRUE)
-# satl.k2.neighbors <-nb2listw(satl.dist.k2, style="W", zero.policy = TRUE)
-# wsc.k1.neighbors <-nb2listw(wsc.dist.k1, style="W", zero.policy = TRUE)
+esc.k5.neighbors <-nb2listw(esc.dist.k5, style="W", zero.policy = TRUE)
+satl.k2.neighbors <-nb2listw(satl.dist.k2, style="W", zero.policy = TRUE)
+wsc.k1.neighbors <-nb2listw(wsc.dist.k1, style="W", zero.policy = TRUE)
 
 #Creating the equation
 equation <- child.pov.2016 ~ rural + urban + lnmanufacturing + lnag + 
@@ -256,3 +267,167 @@ final_map <- ggdraw() +
   draw_plot(fit_pov_map, x = 0, y = 0, width = 1, height = 1) +
   draw_plot(legend, x = 0.55, y = 0.075, width = 0.15, height = 0.25) 
 final_map
+
+#Regional Analyses and other models
+se.cont.lag.model <- spatialreg::lagsarlm(equation, data=se.data,
+                                          se.neighbors.list)
+se.cont.lag.summary <- summary(se.cont.lag.model, Nagelkerke = TRUE)
+se.cont.lag.summary
+
+se.cont.err.model <- spatialreg::errorsarlm(equation, data=se.data,
+                                          se.neighbors.list)
+se.cont.err.summary <- summary(se.cont.err.model, Nagelkerke = TRUE)
+se.cont.err.summary
+
+dist.err.model <- spatialreg::errorsarlm(equation, data=se.data, 
+                                       county.k1.neighbors)
+dist.err.summary <- summary(dist.err.model, Nagelkerke = TRUE)
+dist.err.summary
+
+#Original distance error models + lag
+#ESC
+
+esc.dist.lag.model <- spatialreg::lagsarlm(equation, data=esc.data, 
+                                       esc.k5.neighbors)
+esc.dist.lag.summary <- summary(esc.dist.lag.model, Nagelkerke = TRUE)
+esc.dist.lag.summary
+esc.dist.err.model <- spatialreg::errorsarlm(equation, data=esc.data, 
+                                             esc.k5.neighbors)
+esc.dist.err.summary <- summary(esc.dist.err.model, Nagelkerke = TRUE)
+esc.dist.err.summary
+
+#SATL
+satl.dist.lag.model <- spatialreg::lagsarlm(equation, data=satl.data, 
+                                       satl.k2.neighbors)
+satl.dist.lag.summary <- summary(satl.dist.lag.model, Nagelkerke = TRUE)
+satl.dist.lag.summary
+satl.dist.err.model <- spatialreg::errorsarlm(equation, data=satl.data, 
+                                         satl.k2.neighbors)
+satl.dist.err.summary <- summary(satl.dist.err.model, Nagelkerke = TRUE)
+satl.dist.err.summary
+
+#WSC
+wsc.dist.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data, 
+                                       wsc.k1.neighbors)
+wsc.dist.lag.summary <- summary(wsc.dist.lag.model, Nagelkerke = TRUE)
+wsc.dist.lag.summary
+wsc.dist.err.model <- spatialreg::errorsarlm(equation, data=wsc.data, 
+                                         wsc.k1.neighbors)
+wsc.dist.err.summary <- summary(wsc.dist.err.model, Nagelkerke = TRUE)
+wsc.dist.err.summary
+
+#additional distance models
+
+#Create distance centroid
+county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
+county.k2 <-knn2nb(knearneigh(county.xy, k=2, longlat = TRUE))
+county.k3 <-knn2nb(knearneigh(county.xy, k=3, longlat = TRUE))
+county.k4 <-knn2nb(knearneigh(county.xy, k=4, longlat = TRUE))
+county.k5 <-knn2nb(knearneigh(county.xy, k=5, longlat = TRUE))
+esc.k1 <-knn2nb(knearneigh(esc.xy, k=1, longlat = TRUE))
+esc.k2 <-knn2nb(knearneigh(esc.xy, k=2, longlat = TRUE))
+esc.k3 <-knn2nb(knearneigh(esc.xy, k=3, longlat = TRUE))
+esc.k4 <-knn2nb(knearneigh(esc.xy, k=4, longlat = TRUE))
+esc.k5 <-knn2nb(knearneigh(esc.xy, k=5, longlat = TRUE))
+satl.k1 <-knn2nb(knearneigh(satl.xy, k=1, longlat = TRUE))
+satl.k2 <-knn2nb(knearneigh(satl.xy, k=2, longlat = TRUE))
+satl.k3 <-knn2nb(knearneigh(satl.xy, k=3, longlat = TRUE))
+satl.k4 <-knn2nb(knearneigh(satl.xy, k=4, longlat = TRUE))
+satl.k5 <-knn2nb(knearneigh(satl.xy, k=5, longlat = TRUE))
+wsc.k1 <-knn2nb(knearneigh(wsc.xy, k=1, longlat = TRUE))
+wsc.k2 <-knn2nb(knearneigh(wsc.xy, k=2, longlat = TRUE))
+wsc.k3 <-knn2nb(knearneigh(wsc.xy, k=3, longlat = TRUE))
+wsc.k4 <-knn2nb(knearneigh(wsc.xy, k=4, longlat = TRUE))
+wsc.k5 <-knn2nb(knearneigh(wsc.xy, k=5, longlat = TRUE))
+
+#Determine max k distance value
+county.max.k1 <-max(unlist(nbdists(county.k1, county.xy, longlat=TRUE)))
+county.max.k2 <-max(unlist(nbdists(county.k2, county.xy, longlat=TRUE)))
+county.max.k3 <-max(unlist(nbdists(county.k3, county.xy, longlat=TRUE)))
+county.max.k4 <-max(unlist(nbdists(county.k4, county.xy, longlat=TRUE)))
+county.max.k5 <-max(unlist(nbdists(county.k5, county.xy, longlat=TRUE)))
+esc.max.k1 <-max(unlist(nbdists(esc.k1, esc.xy, longlat=TRUE)))
+esc.max.k2 <-max(unlist(nbdists(esc.k2, esc.xy, longlat=TRUE)))
+esc.max.k3 <-max(unlist(nbdists(esc.k3, esc.xy, longlat=TRUE)))
+esc.max.k4 <-max(unlist(nbdists(esc.k4, esc.xy, longlat=TRUE)))
+esc.max.k5 <-max(unlist(nbdists(esc.k5, esc.xy, longlat=TRUE)))
+satl.max.k1 <-max(unlist(nbdists(satl.k1, satl.xy, longlat=TRUE)))
+satl.max.k2 <-max(unlist(nbdists(satl.k2, satl.xy, longlat=TRUE)))
+satl.max.k3 <-max(unlist(nbdists(satl.k3, satl.xy, longlat=TRUE)))
+satl.max.k4 <-max(unlist(nbdists(satl.k4, satl.xy, longlat=TRUE)))
+satl.max.k5 <-max(unlist(nbdists(satl.k5, satl.xy, longlat=TRUE)))
+wsc.max.k1 <-max(unlist(nbdists(wsc.k1, wsc.xy, longlat=TRUE)))
+wsc.max.k2 <-max(unlist(nbdists(wsc.k2, wsc.xy, longlat=TRUE)))
+wsc.max.k3 <-max(unlist(nbdists(wsc.k3, wsc.xy, longlat=TRUE)))
+wsc.max.k4 <-max(unlist(nbdists(wsc.k4, wsc.xy, longlat=TRUE)))
+wsc.max.k5 <-max(unlist(nbdists(wsc.k5, wsc.xy, longlat=TRUE)))
+
+#Calculate neighbors based on distance
+county.dist.k1 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k1, longlat = TRUE)
+county.dist.k2 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k2, longlat = TRUE)
+county.dist.k3 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k3, longlat = TRUE)
+county.dist.k4 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k4, longlat = TRUE)
+county.dist.k5 <-dnearneigh(county.xy, d1=0, d2=1 * county.max.k5, longlat = TRUE)
+esc.dist.k1 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k1, longlat = TRUE)
+esc.dist.k2 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k2, longlat = TRUE)
+esc.dist.k3 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k3, longlat = TRUE)
+esc.dist.k4 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k4, longlat = TRUE)
+esc.dist.k5 <-dnearneigh(esc.xy, d1=0, d2=1 * esc.max.k5, longlat = TRUE)
+satl.dist.k1 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k1, longlat = TRUE)
+satl.dist.k2 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k2, longlat = TRUE)
+satl.dist.k3 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k3, longlat = TRUE)
+satl.dist.k4 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k4, longlat = TRUE)
+satl.dist.k5 <-dnearneigh(satl.xy, d1=0, d2=1 * satl.max.k5, longlat = TRUE)
+wsc.dist.k1 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k1, longlat = TRUE)
+wsc.dist.k2 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k2, longlat = TRUE)
+wsc.dist.k3 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k3, longlat = TRUE)
+wsc.dist.k4 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k4, longlat = TRUE)
+wsc.dist.k5 <-dnearneigh(wsc.xy, d1=0, d2=1 * wsc.max.k5, longlat = TRUE)
+
+#Create neighbor list
+county.k1.neighbors <-nb2listw(county.dist.k1, style="W", zero.policy = TRUE)
+county.k2.neighbors <-nb2listw(county.dist.k2, style="W", zero.policy = TRUE)
+county.k3.neighbors <-nb2listw(county.dist.k3, style="W", zero.policy = TRUE)
+county.k4.neighbors <-nb2listw(county.dist.k4, style="W", zero.policy = TRUE)
+county.k5.neighbors <-nb2listw(county.dist.k5, style="W", zero.policy = TRUE)
+esc.k1.neighbors <-nb2listw(esc.dist.k1, style="W", zero.policy = TRUE)
+esc.k2.neighbors <-nb2listw(esc.dist.k2, style="W", zero.policy = TRUE)
+esc.k3.neighbors <-nb2listw(esc.dist.k3, style="W", zero.policy = TRUE)
+esc.k4.neighbors <-nb2listw(esc.dist.k4, style="W", zero.policy = TRUE)
+esc.k5.neighbors <-nb2listw(esc.dist.k5, style="W", zero.policy = TRUE)
+satl.k1.neighbors <-nb2listw(satl.dist.k1, style="W", zero.policy = TRUE)
+satl.k2.neighbors <-nb2listw(satl.dist.k2, style="W", zero.policy = TRUE)
+satl.k3.neighbors <-nb2listw(satl.dist.k3, style="W", zero.policy = TRUE)
+satl.k4.neighbors <-nb2listw(satl.dist.k4, style="W", zero.policy = TRUE)
+satl.k5.neighbors <-nb2listw(satl.dist.k5, style="W", zero.policy = TRUE)
+wsc.k1.neighbors <-nb2listw(wsc.dist.k1, style="W", zero.policy = TRUE)
+wsc.k2.neighbors <-nb2listw(wsc.dist.k2, style="W", zero.policy = TRUE)
+wsc.k3.neighbors <-nb2listw(wsc.dist.k3, style="W", zero.policy = TRUE)
+wsc.k4.neighbors <-nb2listw(wsc.dist.k4, style="W", zero.policy = TRUE)
+wsc.k5.neighbors <-nb2listw(wsc.dist.k5, style="W", zero.policy = TRUE)
+
+#Alter for each dist model
+wsc.dist5.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data, 
+                                           wsc.k5.neighbors)
+wsc.dist5.lag.summary <- summary(wsc.dist5.lag.model, Nagelkerke = TRUE)
+wsc.dist5.lag.summary
+
+wsc.dist5.err.model <- spatialreg::errorsarlm(equation, data=wsc.data, 
+                                             wsc.k5.neighbors)
+wsc.dist5.err.summary <- summary(wsc.dist5.err.model, Nagelkerke = TRUE)
+wsc.dist5.err.summary
+
+#Regional Cont Models
+wsc.cont.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data, 
+                                       wsc.neighbors.list)
+wsc.cont.lag.summary <- summary(wsc.cont.lag.model, Nagelkerke = TRUE)
+wsc.cont.lag.summary
+
+wsc.cont.err.model <- spatialreg::errorsarlm(equation, data=wsc.data, 
+                                       wsc.neighbors.list)
+wsc.cont.err.summary <- summary(wsc.cont.err.model, Nagelkerke = TRUE)
+wsc.cont.err.summary
+
+#Regular OLS
+wsc.ols <- lm(equation, data=wsc.data)
+summary(wsc.ols)
