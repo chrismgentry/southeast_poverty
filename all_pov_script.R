@@ -1,6 +1,6 @@
 packages<-c("cowplot", "dplyr", "geosphere", "ggplot2", "ggExtra", "maps", "maptools", "readxl", 
             "rgdal", "rgeos", "sf", "sp", "spatialreg", "spdep", "stringr","tidyr", "viridis")
-sapply(packages, library, character.only=T)
+sapply(packages, require, character.only=T)
 
 #The Data
 se.data <- read.csv("./Data/childpov18_southfull.csv", 
@@ -89,12 +89,16 @@ wsc.neighbors.list<-nb2listw(wsc.neighbors, style="W", zero.policy = TRUE,
 #Create xy for all counties
 county.xy<-centroid(se.shape)
 colnames(county.xy)<-cbind("x","y")
+rownames(county.xy)<-se.data$FIPS
 esc.xy<-centroid(esc.shape)
 colnames(esc.xy)<-cbind("x","y")
+rownames(esc.xy)<-esc.data$FIPS
 satl.xy<-centroid(satl.shape)
 colnames(satl.xy)<-cbind("x","y")
+rownames(satl.xy)<-satl.data$FIPS
 wsc.xy<-centroid(wsc.shape)
 colnames(wsc.xy)<-cbind("x","y")
+rownames(wsc.xy)<-wsc.data$FIPS
 
 #Create distance centroid
 county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
@@ -431,3 +435,67 @@ wsc.cont.err.summary
 #Regular OLS
 wsc.ols <- lm(equation, data=wsc.data)
 summary(wsc.ols)
+
+#Previous Analysis
+
+#Import old data
+old.se.data <- read.csv("./Data/chpov_south_jan17.csv", 
+                    colClasses = c("character", "character", "character", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric", "numeric", 
+                                   "numeric", "numeric"))
+
+#create subsets for old data
+old.satl.data <- subset(old.se.data, state %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"))
+old.esc.data <- subset(old.se.data, state %in% c("AL", "KY", "MS", "TN"))
+old.wsc.data <- subset(old.se.data, state %in% c("AR", "LA", "OK", "TX"))
+
+#join with old data
+old.counties <- counties %>% left_join(old.se.data, by = c("fips" = "fips"))
+
+#old data equation
+old.equation <- lnchildpov_under18 ~ rural + urban + lnmanufacturing + lnag + 
+  lnretail + lnhealth + lnconstruction + lnless_hs + lnunemployment + 
+  lnsingle_mom + lnblack + lnhispanic + lnuninsured + lnincome_ratio + 
+  lnteenbirth + lnunmarried
+
+#Old OLS
+old.ols <- lm(old.equation, data = old.se.data)
+summary(old.ols)
+
+#Old Morans Test
+old.cont.morans <- lm.morantest(old.ols, se.neighbors.list)
+old.cont.morans
+old.dist.morans <- lm.morantest(old.ols, county.k1.neighbors)
+old.dist.morans
+
+#Old LaGrange Multiplier
+old.cont.lm.tests <- lm.LMtests(old.ols, se.neighbors.list, test="all")
+old.cont.lm.tests
+old.dist.lm.tests <- lm.LMtests(old.ols, county.k1.neighbors, test="all")
+old.dist.lm.tests
+
+#Old analyses
+old.dist.err.model <- spatialreg::errorsarlm(old.equation, data=old.se.data, 
+                                         county.k1.neighbors)
+old.dist.err.summary <- summary(old.dist.err.model, Nagelkerke = TRUE)
+old.dist.err.summary
+
+old.esc.err.model <- spatialreg::errorsarlm(old.equation, data=old.esc.data, 
+                                             esc.k5.neighbors)
+old.esc.err.summary <- summary(old.esc.err.model, Nagelkerke = TRUE)
+old.esc.err.summary
+
+old.satl.err.model <- spatialreg::errorsarlm(old.equation, data=old.satl.data, 
+                                             satl.k2.neighbors)
+old.satl.err.summary <- summary(old.satl.err.model, Nagelkerke = TRUE)
+old.satl.err.summary
+
+old.wsc.err.model <- spatialreg::errorsarlm(old.equation, data=old.wsc.data, 
+                                             wsc.k1.neighbors)
+old.wsc.err.summary <- summary(old.wsc.err.model, Nagelkerke = TRUE)
+old.wsc.err.summary
