@@ -503,10 +503,16 @@ old.wsc.err.summary
 #Nested Models
 sdm <- spatialreg::lagsarlm(equation, se.data, county.k1.neighbors, type = "mixed")
 sdm.summary <- summary(sdm, Nagelkerke = TRUE)
-sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
+esc.sdm <- spatialreg::lagsarlm(equation, esc.data, esc.k5.neighbors, type = "mixed")
+esc.sdm.summary <- summary(esc.sdm, Nagelkerke = TRUE) #not significant
+satl.sdm <- spatialreg::lagsarlm(equation, satl.data, satl.k1.neighbors, type = "mixed")
+satl.sdm.summary <- summary(satl.sdm, Nagelkerke = TRUE)
+wsc.sdm <- spatialreg::lagsarlm(equation, wsc.data, wsc.k1.neighbors, type = "mixed")
+wsc.sdm.summary <- summary(wsc.sdm, Nagelkerke = TRUE)
+#sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
 
-sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
-summary(sdem, Nagelkerke = TRUE)
+#sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
+#summary(sdem, Nagelkerke = TRUE)
 #summary(spatialreg::impacts(sdem, listw = county.k1.neighbors, R = 100), zstats = TRUE)[["pzmat"]]
 
 #Simplifying Nested Models

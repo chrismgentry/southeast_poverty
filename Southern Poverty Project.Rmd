@@ -517,4 +517,8 @@ data:
 Likelihood ratio = 25.934, df = 1, p-value = 3.533e-07
 sample estimates:
   Log likelihood of sdm Log likelihood of se.SLX.model
-      -4559.667                      -4572.634 
+      -4559.667                      -4572.634
+
+<p align="center">
+![Plot Example](plot.png "Plot Example")
+</p>
