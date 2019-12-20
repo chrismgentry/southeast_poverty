@@ -86,18 +86,19 @@ satl.neighbors.list<-nb2listw(satl.neighbors, style="W", zero.policy = TRUE,
                             row.names(names(satl.neighbors)))
 wsc.neighbors.list<-nb2listw(wsc.neighbors, style="W", zero.policy = TRUE, 
                             row.names(names(wsc.neighbors)))
+
 #Create xy for all counties
-county.xy<-centroid(se.shape)
-colnames(county.xy)<-cbind("x","y")
+county.xy<-cbind(se.data$Longitude,se.data$Latitude)
+colnames(county.xy) <- c("x","y")
 rownames(county.xy)<-se.data$FIPS
-esc.xy<-centroid(esc.shape)
-colnames(esc.xy)<-cbind("x","y")
+esc.xy<-cbind(esc.data$Longitude,esc.data$Latitude)
+colnames(esc.xy)<-c("x","y")
 rownames(esc.xy)<-esc.data$FIPS
-satl.xy<-centroid(satl.shape)
-colnames(satl.xy)<-cbind("x","y")
+satl.xy<-cbind(satl.data$Longitude,satl.data$Latitude)
+colnames(satl.xy)<-c("x","y")
 rownames(satl.xy)<-satl.data$FIPS
-wsc.xy<-centroid(wsc.shape)
-colnames(wsc.xy)<-cbind("x","y")
+wsc.xy<-cbind(wsc.data$Longitude,wsc.data$Latitude)
+colnames(wsc.xy)<-c("x","y")
 rownames(wsc.xy)<-wsc.data$FIPS
 
 #Create distance centroid
@@ -137,14 +138,14 @@ ols <- lm(equation, data=se.data)
 summary(ols)
 
 #Morans Test
-# cont.morans <- lm.morantest(ols, se.neighbors.list)
-# cont.morans, did not produce significant results
+cont.morans <- lm.morantest(ols, se.neighbors.list)
+cont.morans #did not produce significant results
 dist.morans <- lm.morantest(ols, county.k1.neighbors)
 dist.morans
 
 #LaGrange Multiplier
-# cont.lm.tests <- lm.LMtests(ols, se.neighbors.list, test="all")
-# cont.lm.tests, did not produce significant results
+cont.lm.tests <- lm.LMtests(ols, se.neighbors.list, test="all")
+cont.lm.tests #did not produce significant results
 dist.lm.tests <- lm.LMtests(ols, county.k1.neighbors, test="all")
 dist.lm.tests
 
@@ -411,42 +412,42 @@ wsc.k4.neighbors <-nb2listw(wsc.dist.k4, style="W", zero.policy = TRUE)
 wsc.k5.neighbors <-nb2listw(wsc.dist.k5, style="W", zero.policy = TRUE)
 
 #Alter for each dist model
-wsc.dist5.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data, 
+wsc.dist5.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data,
                                            wsc.k5.neighbors)
 wsc.dist5.lag.summary <- summary(wsc.dist5.lag.model, Nagelkerke = TRUE)
 wsc.dist5.lag.summary
 
-wsc.dist5.err.model <- spatialreg::errorsarlm(equation, data=wsc.data, 
+wsc.dist5.err.model <- spatialreg::errorsarlm(equation, data=wsc.data,
                                              wsc.k5.neighbors)
 wsc.dist5.err.summary <- summary(wsc.dist5.err.model, Nagelkerke = TRUE)
 wsc.dist5.err.summary
 
 #Regional Cont Models
-wsc.cont.lag.model <- spatialreg::lagsarlm(equation, data=wsc.data, 
+old.wsc.cont.lag.model <- spatialreg::lagsarlm(old.equation, data=old.wsc.data,
                                        wsc.neighbors.list)
-wsc.cont.lag.summary <- summary(wsc.cont.lag.model, Nagelkerke = TRUE)
-wsc.cont.lag.summary
+old.wsc.cont.lag.summary <- summary(old.wsc.cont.lag.model, Nagelkerke = TRUE)
+old.wsc.cont.lag.summary
 
-wsc.cont.err.model <- spatialreg::errorsarlm(equation, data=wsc.data, 
+old.wsc.cont.err.model <- spatialreg::errorsarlm(old.equation, data=old.wsc.data,
                                        wsc.neighbors.list)
-wsc.cont.err.summary <- summary(wsc.cont.err.model, Nagelkerke = TRUE)
-wsc.cont.err.summary
+old.wsc.cont.err.summary <- summary(old.wsc.cont.err.model, Nagelkerke = TRUE)
+old.wsc.cont.err.summary
 
-#Regular OLS
-wsc.ols <- lm(equation, data=wsc.data)
-summary(wsc.ols)
+# #Regular OLS
+old.wsc.ols <- lm(old.equation, data=old.wsc.data)
+summary(old.wsc.ols)
 
 #Previous Analysis
 
 #Import old data
 old.se.data <- read.csv("./Data/chpov_south_jan17.csv", 
                     colClasses = c("character", "character", "character", 
+                                   "numeric", "numeric", "integer", 
                                    "numeric", "numeric", "numeric", 
                                    "numeric", "numeric", "numeric", 
                                    "numeric", "numeric", "numeric", 
                                    "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
-                                   "numeric", "numeric", "numeric", 
+                                   "integer", "numeric", "numeric", 
                                    "numeric", "numeric"))
 
 #create subsets for old data
@@ -458,10 +459,9 @@ old.wsc.data <- subset(old.se.data, state %in% c("AR", "LA", "OK", "TX"))
 old.counties <- counties %>% left_join(old.se.data, by = c("fips" = "fips"))
 
 #old data equation
-old.equation <- lnchildpov_under18 ~ rural + urban + lnmanufacturing + lnag + 
-  lnretail + lnhealth + lnconstruction + lnless_hs + lnunemployment + 
-  lnsingle_mom + lnblack + lnhispanic + lnuninsured + lnincome_ratio + 
-  lnteenbirth + lnunmarried
+old.equation <- lnchildpov_under18 ~ rural +urban + lnmanufacturing + lnag + lnretail + lnhealth + 
+  lnconstruction + lnless_hs +lnunemployment + lnincome_ratio + lnteenbirth + lnunmarried + 
+  lnsingle_mom + lnuninsured + lnblack + lnhispanic
 
 #Old OLS
 old.ols <- lm(old.equation, data = old.se.data)
@@ -499,3 +499,23 @@ old.wsc.err.model <- spatialreg::errorsarlm(old.equation, data=old.wsc.data,
                                              wsc.k1.neighbors)
 old.wsc.err.summary <- summary(old.wsc.err.model, Nagelkerke = TRUE)
 old.wsc.err.summary
+
+#Nested Models
+sdm <- spatialreg::lagsarlm(equation, se.data, county.k1.neighbors, type = "mixed")
+sdm.summary <- summary(sdm, Nagelkerke = TRUE)
+sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
+
+sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
+summary(sdem, Nagelkerke = TRUE)
+#summary(spatialreg::impacts(sdem, listw = county.k1.neighbors, R = 100), zstats = TRUE)[["pzmat"]]
+
+#Simplifying Nested Models
+spatialreg::LR.sarlm(sdm,se.ols)
+spatialreg::LR.sarlm(sdm,se.SLX.model)
+spatialreg::LR.sarlm(sdm,dist.lag.model)
+spatialreg::LR.sarlm(sdm,dist.err.model)
+spatialreg::LR.sarlm(sdem,se.ols)
+spatialreg::LR.sarlm(sdem,se.SLX.model)
+spatialreg::LR.sarlm(sdem,dist.err.model)
+
+spatialreg::Hausman.test(dist.err.model)

@@ -128,8 +128,9 @@ se.neighbors.list<-nb2listw(se.neighbors, style="W", zero.policy = TRUE,
                             row.names(names(se.neighbors)))
 
 #Create xy for all counties for distance weights
-county.xy<-centroid(se.shape)
+county.xy<-cbind(se.shape$Longitude,se.shape$Latitude)
 colnames(county.xy)<-cbind("x","y")
+rownames(county.xy)<-se.shape$FIPS
 
 #Create distance centroid for the k=1 nearest neighbor
 county.k1 <-knn2nb(knearneigh(county.xy, k=1, longlat = TRUE))
@@ -376,21 +377,144 @@ final_map <- ggdraw() +
 final_map
 ```
 
-# All Models - Southeast and Regional Comparisons
+# Models Comparisons and the Spatial Durbin Model
 
 Table 1    |       | Southeast |        | ESC     |       | SATL    |        | WSC     |       |
 --------   | ----- | --------  | ------ | ------- | ----- | ------- | ------ | ------- | ----- | 
 *Neighbors*|*Model*|*P Value*  |*r2*    |*P Value*|*r2*   |*P Value*|*r2*    |*P Value*|*r2*   |
-OLS        |  -    |**2.20E-16** | 0.64   |**2.20E-16**| 0.65  |**2.20E-16**| 0.68   |**2.20E-16**| 0.57  |
-Contiguity | Lag   | 0.20499   | 0.64   | 0.84573 | 0.66  | 0.44619 | 0.70   | 0.44057 | 0.59  |
-Contiguity | Err   | 0.40853   | 0.64   | 0.92468 | 0.66  | 0.11621 | 0.70   | 0.62070 | 0.59  |
-K = 1      | Lag   | **0.00883**   | 0.65   | 0.50521 | 0.66  | 0.27857 | 0.70   | 0.50967 | 0.59  |
-K = 1      | Err   | **0.04300**   | 0.65   | 0.39037 | 0.66  | 0.24570 | 0.70   | 0.70773 | 0.60  |
-K = 2      | Lag   | **0.00122**   | 0.65   | 0.47729 | 0.67  | 0.07678 | 0.70   | 0.46195 | 0.60  |
-K = 2      | Err   | 0.07782     | 0.64   | 0.23184 | 0.66  | 0.48469 | 0.70   | 0.87245 | 0.60  |
-K = 3      | Lag   | **0.00004**   | 0.65   | 0.27805 | 0.66  | 0.06592 | 0.70   | 0.06003 | 0.60  |
-K = 3      | Err   | **0.01357**   | 0.65   | 0.15882 | 0.67  | 0.36543 | 0.70   | 0.33108 | 0.60  |
-K = 4      | Lag   | **0.00006**   | 0.65   | 0.19296 | 0.66  | 0.14170 | 0.70   | 0.05680 | 0.60  |
-K = 4      | Err   | **0.01368**   | 0.65   | 0.10119 | 0.67  | 0.81544 | 0.69   | 0.20910 | 0.60  |
-K = 5      | Lag   | **0.00014**   | 0.65   | 0.17541 | 0.66  | 0.31738 | 0.69   | **0.03800** | 0.60  |
-K = 5      | Err   | **0.01831**   | 0.65   | 0.11001 | 0.67  | 0.62396 | 0.69   | 0.16585 | 0.60  |
+OLS        |-|-|-|-|-|-|-|-|-|
+Contiguity |-|-|-|-|-|-|-|-|-|
+Contiguity |-|-|-|-|-|-|-|-|-|
+K = 1      | Lag |-|-|-|-|-|-|-|-|
+K = 1      | Err |-|-|-|-|-|-|-|-|
+K = 2      | Lag |-|-|-|-|-|-|-|-|
+K = 2      | Err |-|-|-|-|-|-|-|-|
+K = 3      | Lag |-|-|-|-|-|-|-|-|
+K = 3      | Err |-|-|-|-|-|-|-|-|
+K = 4      | Lag |-|-|-|-|-|-|-|-|
+K = 4      | Err |-|-|-|-|-|-|-|-|
+K = 5      | Lag |-|-|-|-|-|-|-|-|
+K = 5      | Err |-|-|-|-|-|-|-|-|
+
+*See emailed excel sheet for model comparisons*
+
+## Spatial Durbin Model
+
+```spatialreg::lagsarlm(formula = equation, data = se.data, listw = county.k1.neighbors, type = "mixed")```
+
+Residuals:
+
+Min|        1Q|    Median|        3Q|       Max|
+---|---|---|---|---|
+-28.74491|  -3.43236|  -0.14565|   3.48841|  23.22000| 
+
+Type: mixed
+Coefficients: (asymptotic standard errors)
+
+Variables|            Estimate| Std. Error| z value|  Pr(>|z|)|
+---|---|---|---|---|
+(Intercept)         |-55.878981  |11.720483 |-4.7676 |1.864e-06|
+rural               |  0.564021   |0.516014  |1.0930 |0.2743786|
+urban               | *-1.082678*   |0.426305 |-2.5397 |**0.0110955**|
+lnmanufacturing     | -0.100317   |0.327628 |-0.3062 |0.7594579|
+lnag                | -0.115679   |0.240896 |-0.4802 |0.6310831|
+lnretail            | *-2.489002*   |0.649935 |-3.8296 |**0.0001283**|
+lnhealthss          |  1.169469   |0.992463 | 1.1783 |0.2386572|
+lnconstruction      | *-1.731440*   |0.483725 |-3.5794 |**0.0003444**|
+lnlesshs            |  8.623386   |0.919595 | 9.3774 |**< 2.2e-16**|
+lnunemployment      |  8.676517   |0.928129 | 9.3484 |**< 2.2e-16**|
+lnsinglemom         |  3.840103   |0.509206 | 7.5414 |**4.641e-14**|
+lnblack             |  0.096474   |0.185720 | 0.5195 |0.6034406|
+lnhispanic          | -0.027515   |0.216102 |-0.1273 |0.8986841|
+lnuninsured         |  7.337132   |1.628030 | 4.5068 |**6.583e-06**|
+lnincome_ratio      |  7.697120   |1.435136 | 5.3633 |**8.170e-08**|
+lnteenbirth         |  0.645879   |0.448710 | 1.4394 |0.1500330|
+lnunmarried         |  0.766344   |0.209124 | 3.6645 |**0.0002478**|
+lag.rural           |  4.021928   |1.851745 | 2.1720 |**0.0298582**|
+lag.urban           |  0.869751   |1.403582 | 0.6197 |0.5354781|
+lag.lnmanufacturing | -0.293037   |0.568966 |-0.5150 |0.6065290|
+lag.lnag            |  0.542286   |0.522820 | 1.0372 |0.2996274|
+lag.lnretail        |  4.059779   |1.897014 | 2.1401 |**0.0323476**|
+lag.lnhealthss      |  2.141309   |2.541929 | 0.8424 |0.3995667|
+lag.lnconstruction  | *-3.151835*   |1.285967 |-2.4509 |**0.0142481**|
+lag.lnlesshs        | *-5.750119*   |1.750921 |-3.2841 |**0.0010233**|
+lag.lnunemployment  |  0.133170   |1.924122 | 0.0692 |0.9448218|
+lag.lnsinglemom     |  0.101467   |1.530051 | 0.0663 |0.9471263|
+lag.lnblack         | -0.259104   |0.276019 |-0.9387 |0.3478769|
+lag.lnhispanic      | -0.519524   |0.404193 |-1.2853 |0.1986742|
+lag.lnuninsured     | -1.696353   |2.608677 |-0.6503 |0.5155158|
+lag.lnincome_ratio  | -0.056359   |4.332773 |-0.0130 |0.9896216|
+lag.lnteenbirth     | -0.567029   |1.356737 |-0.4179 |0.6759939|
+lag.lnunmarried     |  1.171540   |0.716882 | 1.6342 |0.1022137|
+
+Rho: 0.31035, LR test value: 25.934, **p-value: 3.5332e-07**
+Asymptotic standard error: 0.059539
+    z-value: 5.2125, p-value: 1.8626e-07
+    Wald statistic: 27.171, p-value: 1.8626e-07
+
+Log likelihood: -4559.667 for mixed model
+ML residual variance (sigma squared): 35.454, (sigma: 5.9544)
+**Nagelkerke pseudo-R-squared: 0.66976 **
+Number of observations: 1422 
+Number of parameters estimated: 35 
+AIC: 9189.3, (AIC for lm: 9213.3)
+LM test for residual autocorrelation
+test value: 1.4054, p-value: 0.23582
+
+## Results of the Impacts Matrix for the Spatial Durbin Model 
+(p-value: 0.00000035332, Nagelkerke pseudo-R-squared: 0.66976)
+
+```summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)```
+
+*Simulated p-values: *
+
+Variables       |Direct       |Indirect    |Total|
+----------------|-------------|------------|-----|
+rural           |1.780316e-01 |0.012464111 |0.006144104871044|
+urban           |1.856746e-02 |0.717466580 |0.874019334065769|
+lnmanufacturing |7.228896e-01 |0.583973745 |0.390866421150259|
+lnag            |7.932686e-01 |0.333981361 |0.370935523493408|
+lnretail        |2.523354e-04 |0.099930330 |0.466357849247926|
+lnhealthss      |1.665606e-01 |0.311031649 |0.150695893806486|
+lnconstruction  |1.143297e-04 |0.005269531 |0.000173706891136|
+lnlesshs        |0.000000e+00 |0.050337903 |0.059197545345715|
+lnunemployment  |0.000000e+00 |0.071584701 |0.000000001630968|
+lnsinglemom     |4.793943e-13 |0.335155202 |0.005029800065723|
+lnblack         |6.952727e-01 |0.309707368 |0.354656155664491|
+lnhispanic      |9.845287e-01 |0.149133698 |0.115800050546320|
+lnuninsured     |4.725662e-07 |0.753298838 |0.005112658006164|
+lnincome_ratio  |3.498042e-08 |0.571748006 |0.060456851707430|
+lnteenbirth     |1.083868e-01 |0.749855443 |0.973332222700487|
+lnunmarried     |7.400211e-04 |0.055390138 |0.007406105809781|
+
+## Likelihood Ratio Results
+
+**spatialreg::LR.sarlm(sdm,dist.lag.model)**
+
+  Likelihood ratio for spatial linear models
+  
+data:
+Likelihood ratio = 53.033, df = 16, p-value = 0.000007454
+sample estimates:
+    Log likelihood of sdm Log likelihood of dist.lag.model
+        -4559.667                        -4586.183 
+
+**spatialreg::LR.sarlm(sdm,dist.err.model)**
+
+Likelihood ratio for spatial linear models
+  
+data:
+Likelihood ratio = 57.605, df = 16, p-value = 0.000001318
+sample estimates:
+  Log likelihood of sdm Log likelihood of dist.err.model
+      -4559.667                        -4588.470
+
+**spatialreg::LR.sarlm(sdm,se.SLX.model)**
+
+Likelihood ratio for spatial linear models
+
+data:
+Likelihood ratio = 25.934, df = 1, p-value = 3.533e-07
+sample estimates:
+  Log likelihood of sdm Log likelihood of se.SLX.model
+      -4559.667                      -4572.634 
