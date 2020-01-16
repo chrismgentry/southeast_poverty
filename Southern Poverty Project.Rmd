@@ -1,6 +1,6 @@
 ---
 title: Analysis of Southern Poverty <br><small>An Examination with Spatial Regression</small></br>
-author: "Dr. Trevor Brooks and Dr. Christopher Gentry"
+author: "Drs. Trevor Brooks, Kadi Bliss, Melissa Gomez, and Christopher Gentry"
 output:
   html_notebook:
     df_print: paged
@@ -382,19 +382,31 @@ final_map
 Table 1    |       | Southeast |        | ESC     |       | SATL    |        | WSC     |       |
 --------   | ----- | --------  | ------ | ------- | ----- | ------- | ------ | ------- | ----- | 
 *Neighbors*|*Model*|*P Value*  |*r2*    |*P Value*|*r2*   |*P Value*|*r2*    |*P Value*|*r2*   |
-OLS        |-|-|-|-|-|-|-|-|-|
-Contiguity |-|-|-|-|-|-|-|-|-|
-Contiguity |-|-|-|-|-|-|-|-|-|
-K = 1      | Lag |-|-|-|-|-|-|-|-|
-K = 1      | Err |-|-|-|-|-|-|-|-|
-K = 2      | Lag |-|-|-|-|-|-|-|-|
-K = 2      | Err |-|-|-|-|-|-|-|-|
-K = 3      | Lag |-|-|-|-|-|-|-|-|
-K = 3      | Err |-|-|-|-|-|-|-|-|
-K = 4      | Lag |-|-|-|-|-|-|-|-|
-K = 4      | Err |-|-|-|-|-|-|-|-|
-K = 5      | Lag |-|-|-|-|-|-|-|-|
-K = 5      | Err |-|-|-|-|-|-|-|-|
+OLS        |-|2.20E-16|0.6397|2.20E-16|0.6477|2.20E-16|0.6789|2.20E-16|0.5708|
+Contiguity |Lag|-|-|-|-|-|-|-|-|
+Contiguity |Err|-|-|-|-|-|-|-|-|
+Contiguity |Pre-Lag|-|-|-|-|-|-|-|-|
+Contiguity |Pre-Err|0.02186|0.55169|-|-|0.02580|0.74402|-|-|
+K = 1      | Lag |**0.00000**|**0.65721**|-|-|**0.00012**|**0.69546**|0.00002|0.60085|
+K = 1      | Err |0.00000|0.65611|-|-|0.00256|0.69249|**0.00001**|**0.60206**|
+K = 1      | Pre-Lag |0.00000|0.55732|-|-|0.00060|0.74697|0.01166|0.46203|
+K = 1      | Pre-Err |**0.00000**|**0.58516**|-|-|0.00064|0.74692|0.00000|0.48571|
+K = 2      | Lag |0.00000|0.65269|0.02404|0.66789|0.00045|0.69416|0.00076|0.59529|
+K = 2      | Err |0.00000|0.65232|-|-|0.00611|0.69167|0.00298|0.59312|
+K = 2      | Pre-Lag |0.00005|0.55521|-|-|0.00141|0.74629|0.00776|0.46286|
+K = 2      | Pre-Err |0.00000|0.58475|0.01674|0.65211|**0.00002**|**0.74967**|**0.00000**|**0.48681**|
+K = 3      | Lag |0.00000|0.65024|0.00062|0.67389|0.00135|0.69311|0.00414|0.59259|
+K = 3      | Err |0.00000|0.65046|-|-|-|-|0.01582|0.59051|
+K = 3      | Pre-Lag |0.00160|0.55317|-|-|0.01561|0.74441|0.00984|0.46237|
+K = 3      | Pre-Err |0.00000|0.58085|0.00310|0.65499|0.00212|0.74596|0.00000|0.48368|
+K = 4      | Lag |0.00000|0.64993|0.00060|0.67393|0.00681|0.69156|0.00335|0.59293|
+K = 4      | Err |0.00000|0.65036|-|-|-|-|0.00686|0.59181|
+K = 4      | Pre-Lag |0.00323|0.55277|-|-|-|-|0.01272|0.46185|
+K = 4      | Pre-Err |0.00000|0.57933|**0.00271**|**0.65523**|0.00372|0.74552|0.00000|0.48213|
+K = 5      | Lag |0.00000|0.64978|**0.00060**|**0.67395**|0.01313|0.69095|0.00341|0.59290|
+K = 5      | Err |0.00000|0.64983|0.02000|0.66826|-|-|0.00754|0.59166|
+K = 5      | Pre-Lag |0.00284|0.55284|-|-|-|-|0.00752|0.46292|
+K = 5      | Pre-Err |0.00000|0.57890|0.00281|0.65516|0.00544|0.74522|0.00000|0.48345|
 
 *See emailed excel sheet for model comparisons*
 
@@ -447,19 +459,21 @@ lag.lnincome_ratio  | -0.056359   |4.332773 |-0.0130 |0.9896216|
 lag.lnteenbirth     | -0.567029   |1.356737 |-0.4179 |0.6759939|
 lag.lnunmarried     |  1.171540   |0.716882 | 1.6342 |0.1022137|
 
-Rho: 0.31035, LR test value: 25.934, **p-value: 3.5332e-07**
+<pre>
+Rho: 0.31035, LR test value: 25.934
+p-value: 3.5332e-07
 Asymptotic standard error: 0.059539
-    z-value: 5.2125, p-value: 1.8626e-07
-    Wald statistic: 27.171, p-value: 1.8626e-07
+z-value: 5.2125, p-value: 1.8626e-07, Wald statistic: 27.171, p-value: 1.8626e-07
 
 Log likelihood: -4559.667 for mixed model
 ML residual variance (sigma squared): 35.454, (sigma: 5.9544)
-**Nagelkerke pseudo-R-squared: 0.66976 **
+Nagelkerke pseudo-R-squared: 0.66976
 Number of observations: 1422 
 Number of parameters estimated: 35 
 AIC: 9189.3, (AIC for lm: 9213.3)
 LM test for residual autocorrelation
 test value: 1.4054, p-value: 0.23582
+</pre>
 
 ## Results of the Impacts Matrix for the Spatial Durbin Model 
 (p-value: 0.00000035332, Nagelkerke pseudo-R-squared: 0.66976)
