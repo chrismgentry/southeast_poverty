@@ -67,6 +67,12 @@ southern_counties <- subset(counties, region %in%
                                 "kentucky", "west virginia", "virginia", 
                                 "maryland", "delaware", "district of columbia"))
 
+southern_cities <- subset(us.cities, country.etc %in%
+                            c("TX", "AR", "LA", "MS", "AL", "GA", "FL", "NC",
+                              "SC", "TN", "OK", "KY", "WV", "VA", "MD", "DE", "DC"))
+
+southern_cities <- subset(southern_cities, pop >= 100000)
+
 #Create neighbors
 se.neighbors<-poly2nb(se.shape, queen=T, row.names = se.shape$FIPS)
 names(se.neighbors) <- names(se.shape$FIPS)
@@ -148,6 +154,27 @@ cont.lm.tests <- lm.LMtests(ols, se.neighbors.list, test="all")
 cont.lm.tests #did not produce significant results
 dist.lm.tests <- lm.LMtests(ols, county.k1.neighbors, test="all")
 dist.lm.tests
+
+#Morans with Monte Carlo
+mc.morans <- spdep::moran.mc(se.data$child.pov.2016, county.k1.neighbors, nsim = 99)
+mc.morans
+
+lc.morans <- spdep::localmoran(se.data$child.pov.2016, county.k1.neighbors)
+lc.morans
+
+pov.rate <- scale(se.data$child.pov.2016) %>% as.vector()
+pov.lag.rate <- lag.listw(county.k1.neighbors, pov.rate)
+
+lisa.data <- se.data %>%
+  mutate(quad_sig = case_when(
+    pov.rate >= 0 & pov.lag.rate >= 0 & lc.morans[, 5] <= 0.05 ~ "high-high",
+    pov.rate <= 0 & pov.lag.rate <= 0 & lc.morans[, 5] <= 0.05 ~ "low-low",
+    pov.rate >= 0 & pov.lag.rate <= 0 & lc.morans[, 5] <= 0.05 ~ "high-low",
+    pov.rate <= 0 & pov.lag.rate >= 0 & lc.morans[, 5] <= 0.05 ~ "low-high",
+    lc.morans[, 5] > 0.05 ~ "not significant"
+  ))
+
+lisa <- lisa.data %>% fortify()
 
 #Distance Lag Model
 dist.lag.model <- spatialreg::lagsarlm(equation, data=se.data, 
@@ -235,6 +262,8 @@ legend <- ggplot(legend_colors, aes(x,y)) +
 county.data <- southern_counties %>% 
   left_join(dist.lag.data, by = c("fips" = "fips")) %>% fortify
 
+county.data <- county.data %>% left_join(lisa.data, by = c("fips" = "FIPS"))
+
 #attach colors
 bivariate_color_scale <- tibble(
   "3 - 3" = "#574249", 
@@ -248,8 +277,20 @@ bivariate_color_scale <- tibble(
   "1 - 1" = "#e8e8e8") %>%
   gather("group", "fill")
 
+#lisa colors
+lisa_colors <- tibble(
+  "high-high" = "#32C12C",
+  "low-low" = "#526EFF",
+  "high-low" = "#D40C00",
+  "low-high" = "#D40C00",
+  "not significant" = "#9E9E9E") %>%
+  gather("rate","lisa")
+
 county.data <- county.data %>% 
   left_join(bivariate_color_scale, by = c("fit_pov" = "group"))
+
+county.data <- county.data %>% 
+  left_join(lisa_colors, by = c("quad_sig" = "rate"))
 
 #fit map
 fit_pov_map <- ggplot() + 
@@ -258,13 +299,14 @@ fit_pov_map <- ggplot() +
   geom_polygon(data = county.data, aes(x=long, y=lat, group=group, fill = fill)) + 
   geom_polygon(data = southern_counties, aes(x=long,y=lat, group=group), fill = NA, color = "black", size = 0.05) +
   geom_polygon(data = southern_states, aes(x=long,y=lat, group=group), fill = NA, color = "white") +
-  coord_map("conic", lat0 = 30, xlim=c(-106,-77), ylim=c(24.5,40.5)) +
+  #geom_point(data = southern_cities, aes(x=long, y=lat), fill = "black", color = "black") +
+  coord_map("conic", lat0 = 30, xlim=c(-106,-77), ylim=c(24.45,40.5)) +
   scale_fill_identity() +
   theme_grey() + theme(legend.position="bottom") + theme(legend.title.align=0.5) +
   theme(panel.background = element_rect(fill = 'deepskyblue'),
         panel.grid.major = element_line(colour = NA)) +
   labs(x = "Longitude", y = "Latitude", fill = "Child Poverty", 
-       title = "Bivariate Map of Observed vs Modeled Poverty Values") +
+       title = "Bivariate Map of Observed vs. Modeled Poverty Values") +
   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
 #final map

@@ -536,3 +536,31 @@ sample estimates:
 <p align="center">
 ![Plot Example](plot.png "Plot Example")
 </p>
+
+## Morans and Local Indicators of Spatial Association (LISA)
+
+```{r LISA, message=FALSE, warning=FALSE, fig.height = 6, fig.width = 8}
+mc.morans <- spdep::moran.mc(se.data$child.pov.2016, county.k1.neighbors, nsim = 99)
+mc.morans
+
+lc.morans <- spdep::localmoran(se.data$child.pov.2016, county.k1.neighbors)
+lc.morans
+
+pov.rate <- scale(se.data$child.pov.2016) %>% as.vector()
+pov.lag.rate <- lag.listw(county.k1.neighbors, pov.rate)
+
+lisa.data <- se.data %>%
+  mutate(quad_sig = case_when(
+    pov.rate >= 0 & pov.lag.rate >= 0 & lc.morans[, 5] <= 0.05 ~ "high-high",
+    pov.rate <= 0 & pov.lag.rate <= 0 & lc.morans[, 5] <= 0.05 ~ "low-low",
+    pov.rate >= 0 & pov.lag.rate <= 0 & lc.morans[, 5] <= 0.05 ~ "high-low",
+    pov.rate <= 0 & pov.lag.rate >= 0 & lc.morans[, 5] <= 0.05 ~ "low-high",
+    lc.morans[, 5] > 0.05 ~ "not significant"
+  ))
+
+lisa <- lisa.data %>% fortify()
+```
+
+<p align = "center">
+![LISA Example](LISA.png "LISA Example")
+</p>
