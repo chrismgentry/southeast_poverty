@@ -49,7 +49,7 @@ packages<-c("cowplot", "dplyr", "geosphere", "ggplot2", "ggExtra", "maps", "mapt
 sapply(packages, require, character.only=T)
 ```
 
-> You can change **library**, in the line of script above that begins with ```sapply```, to **install.packages** so that it reads ```sapply(packages, install.packages, character.only=T)``` and it will install all of the necessary packages. Then you can revert back to **library** to load them. 
+> You can change **require**, in the line of script above that begins with ```sapply```, to **install.packages** so that it reads ```sapply(packages, install.packages, character.only=T)``` and it will install all of the necessary packages. Then you can revert back to **require or library** to load them. 
 
 # Introduction to the data
 This data, collected by Dr. Brooks, examines the effect of numerous socioeconomic factors as they relate to the percentage of children under the age of 18 who are living below the poverty line in the Southern United States. The data was collected from the U.S. Census Bureau, American Community Survey, Bureau of Labor Force Statistics, U.S. Department of Agriculture Economic Research Service, and the County Health Rankings. Independent variables include: rural, urban, manufacturing, agriculture, retail, healthcare, construction, less than high school degree, unemployment, income ratio, teen birth, unmarried, single mother, uninsured, as well as Black and Hispanic race variables. The data is stored as a comma delimited file and can be found in the *data folder* of this project [repository](https://github.com/chrismgentry/southeast_poverty). To load the data we will use the following script to ensure all of the data is appropriately formatted.
@@ -377,7 +377,7 @@ final_map <- ggdraw() +
 final_map
 ```
 
-# Models Comparisons and the Spatial Durbin Model
+# Models Comparisons and the Spatial Durbin Models
 
 Table 1    |       | Southeast |        | ESC     |       | SATL    |        | WSC     |       |
 --------   | ----- | --------  | ------ | ------- | ----- | ------- | ------ | ------- | ----- | 
@@ -410,134 +410,77 @@ K = 5      | Pre-Err |0.00000|0.57890|0.00281|0.65516|0.00544|0.74522|0.00000|0.
 
 *See emailed excel sheet for model comparisons*
 
+## Model Equations
+
+### Spatially Lagged X Variable(s)
+
+In a non-spatial OLS model, $y = X \beta + \varepsilon$, we examine the relationship between one or more independent variables and a dependent variable. With a spatially lagged, or SLX model, we see an addition of a spatial component to the equation that accounts for the average value of neighboring X values. 
+
+> $y = X \beta + WX\theta + \varepsilon$,&nbsp; where <span style="font-size:12px;">$WX\theta$</span> is the average value of our neighbors independent variable(s)
+
+So the SLX equation examines whether variables that impact our neighbors also impact us. This is consdiered a *local model* as there is only one-way interaction between our neighbors and us.
+
+### Spatial Lag Model
+In the Spatial Lag model, we lose the lagged X values that were used in the SLX model and instead add a spatially lagged y value.
+
+> $y = \rho W y + X \beta + \varepsilon$,&nbsp; where <span style="font-size:12px;">$\rho W y$</span> is the spatially lagged y value of our neighbors
+
+In this *global model* the dependent variable among our neighbors influences our dependent variable. Therefore there is a feedback loop that occurs where affects on our neighbor(s) y affects our y and our neighbor(s) y variable.
+
+### Spatial Error Model
+The Spatial Error model does not include lagged dependent or independent variables, but instead includes a function of our unexplained error and that of our neighbors.
+
+> $y = X \beta + u$, &nbsp; $u = \lambda W u + \varepsilon$,&nbsp; where <span style="font-size:12px;">$\lambda W u + \varepsilon$</span> is the function of our unexplained error (residuals) and our neighbors residual values
+
+This is a *global model* where the higher than expected residual values suggest a missing explanatory variable that is spatially correlated. This would lead to unexplained clusters of spatially correlated values within our neighborhood that were not included as a predictor variable(s). 
+
+### Spatial Durbin Model
+The Spatial Durbin model includes both lagged y and lagged x values. This model can be simplified into *global* SLX, Spatial Lag, Spatial Error models, or OLS.
+
+> $y = \rho Wy + X\beta + WX\theta + \varepsilon$
+
+Because of the inclusion of the lagged y, this model would be used if the relationships in your data are global, meaning that if the y variable is impacted in one region that impact will spill over to every region in the dataset.
+
+### Spatial Durbin Error Model
+This nested model does not contain a lagged y and can be simplified into a *local* Spatial Error, SLX, or OLS model.
+
+> $y = X\beta + WX\theta + u$, &nbsp; $u = \lambda Wu + \varepsilon$
+
+This nested model would be used if the relationships in your data are local, meaning changes in one region will only impact the immediate neighbors of the region and not all of the regions in the dataset.
+
 ## Spatial Durbin Model
 
-```spatialreg::lagsarlm(formula = equation, data = se.data, listw = county.k1.neighbors, type = "mixed")```
+```{r SDM, echo=TRUE, message=FALSE, warning=FALSE}
+summary(spatialreg::lagsarlm(formula = equation, data = se.data, listw = county.k1.neighbors, type = "mixed"))
+```
 
-Residuals:
+### Results of the Impacts Matrix for the Spatial Durbin Model 
 
-Min|        1Q|    Median|        3Q|       Max|
----|---|---|---|---|
--28.74491|  -3.43236|  -0.14565|   3.48841|  23.22000| 
+```{r SDM Impacts, echo=TRUE, message=FALSE, warning=FALSE}
+sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE) #[["pzmat"]]
+sdm.impacts
+```
 
-Type: mixed
-Coefficients: (asymptotic standard errors)
 
-Variables|            Estimate| Std. Error| z value|  Pr(>|z|)|
----|---|---|---|---|
-(Intercept)         |-55.878981  |11.720483 |-4.7676 |1.864e-06|
-rural               |  0.564021   |0.516014  |1.0930 |0.2743786|
-urban               | *-1.082678*   |0.426305 |-2.5397 |**0.0110955**|
-lnmanufacturing     | -0.100317   |0.327628 |-0.3062 |0.7594579|
-lnag                | -0.115679   |0.240896 |-0.4802 |0.6310831|
-lnretail            | *-2.489002*   |0.649935 |-3.8296 |**0.0001283**|
-lnhealthss          |  1.169469   |0.992463 | 1.1783 |0.2386572|
-lnconstruction      | *-1.731440*   |0.483725 |-3.5794 |**0.0003444**|
-lnlesshs            |  8.623386   |0.919595 | 9.3774 |**< 2.2e-16**|
-lnunemployment      |  8.676517   |0.928129 | 9.3484 |**< 2.2e-16**|
-lnsinglemom         |  3.840103   |0.509206 | 7.5414 |**4.641e-14**|
-lnblack             |  0.096474   |0.185720 | 0.5195 |0.6034406|
-lnhispanic          | -0.027515   |0.216102 |-0.1273 |0.8986841|
-lnuninsured         |  7.337132   |1.628030 | 4.5068 |**6.583e-06**|
-lnincome_ratio      |  7.697120   |1.435136 | 5.3633 |**8.170e-08**|
-lnteenbirth         |  0.645879   |0.448710 | 1.4394 |0.1500330|
-lnunmarried         |  0.766344   |0.209124 | 3.6645 |**0.0002478**|
-lag.rural           |  4.021928   |1.851745 | 2.1720 |**0.0298582**|
-lag.urban           |  0.869751   |1.403582 | 0.6197 |0.5354781|
-lag.lnmanufacturing | -0.293037   |0.568966 |-0.5150 |0.6065290|
-lag.lnag            |  0.542286   |0.522820 | 1.0372 |0.2996274|
-lag.lnretail        |  4.059779   |1.897014 | 2.1401 |**0.0323476**|
-lag.lnhealthss      |  2.141309   |2.541929 | 0.8424 |0.3995667|
-lag.lnconstruction  | *-3.151835*   |1.285967 |-2.4509 |**0.0142481**|
-lag.lnlesshs        | *-5.750119*   |1.750921 |-3.2841 |**0.0010233**|
-lag.lnunemployment  |  0.133170   |1.924122 | 0.0692 |0.9448218|
-lag.lnsinglemom     |  0.101467   |1.530051 | 0.0663 |0.9471263|
-lag.lnblack         | -0.259104   |0.276019 |-0.9387 |0.3478769|
-lag.lnhispanic      | -0.519524   |0.404193 |-1.2853 |0.1986742|
-lag.lnuninsured     | -1.696353   |2.608677 |-0.6503 |0.5155158|
-lag.lnincome_ratio  | -0.056359   |4.332773 |-0.0130 |0.9896216|
-lag.lnteenbirth     | -0.567029   |1.356737 |-0.4179 |0.6759939|
-lag.lnunmarried     |  1.171540   |0.716882 | 1.6342 |0.1022137|
+### Likelihood Ratio Results
 
-<pre>
-Rho: 0.31035, LR test value: 25.934
-p-value: 3.5332e-07
-Asymptotic standard error: 0.059539
-z-value: 5.2125, p-value: 1.8626e-07, Wald statistic: 27.171, p-value: 1.8626e-07
+```{r SDM v Dist Lag, echo=TRUE, message=FALSE, warning=FALSE}
+spatialreg::LR.sarlm(sdm,dist.lag.model)
+```
 
-Log likelihood: -4559.667 for mixed model
-ML residual variance (sigma squared): 35.454, (sigma: 5.9544)
-Nagelkerke pseudo-R-squared: 0.66976
-Number of observations: 1422 
-Number of parameters estimated: 35 
-AIC: 9189.3, (AIC for lm: 9213.3)
-LM test for residual autocorrelation
-test value: 1.4054, p-value: 0.23582
-</pre>
+```{r SDM v Dist Err, echo=TRUE, message=FALSE, warning=FALSE}
+spatialreg::LR.sarlm(sdm,dist.err.model)
+```
 
-## Results of the Impacts Matrix for the Spatial Durbin Model 
-(p-value: 0.00000035332, Nagelkerke pseudo-R-squared: 0.66976)
-
-```summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)```
-
-*Simulated p-values: *
-
-Variables       |Direct       |Indirect    |Total|
-----------------|-------------|------------|-----|
-rural           |1.780316e-01 |0.012464111 |0.006144104871044|
-urban           |1.856746e-02 |0.717466580 |0.874019334065769|
-lnmanufacturing |7.228896e-01 |0.583973745 |0.390866421150259|
-lnag            |7.932686e-01 |0.333981361 |0.370935523493408|
-lnretail        |2.523354e-04 |0.099930330 |0.466357849247926|
-lnhealthss      |1.665606e-01 |0.311031649 |0.150695893806486|
-lnconstruction  |1.143297e-04 |0.005269531 |0.000173706891136|
-lnlesshs        |0.000000e+00 |0.050337903 |0.059197545345715|
-lnunemployment  |0.000000e+00 |0.071584701 |0.000000001630968|
-lnsinglemom     |4.793943e-13 |0.335155202 |0.005029800065723|
-lnblack         |6.952727e-01 |0.309707368 |0.354656155664491|
-lnhispanic      |9.845287e-01 |0.149133698 |0.115800050546320|
-lnuninsured     |4.725662e-07 |0.753298838 |0.005112658006164|
-lnincome_ratio  |3.498042e-08 |0.571748006 |0.060456851707430|
-lnteenbirth     |1.083868e-01 |0.749855443 |0.973332222700487|
-lnunmarried     |7.400211e-04 |0.055390138 |0.007406105809781|
-
-## Likelihood Ratio Results
-
-**spatialreg::LR.sarlm(sdm,dist.lag.model)**
-
-  Likelihood ratio for spatial linear models
-  
-data:
-Likelihood ratio = 53.033, df = 16, p-value = 0.000007454
-sample estimates:
-    Log likelihood of sdm Log likelihood of dist.lag.model
-        -4559.667                        -4586.183 
-
-**spatialreg::LR.sarlm(sdm,dist.err.model)**
-
-Likelihood ratio for spatial linear models
-  
-data:
-Likelihood ratio = 57.605, df = 16, p-value = 0.000001318
-sample estimates:
-  Log likelihood of sdm Log likelihood of dist.err.model
-      -4559.667                        -4588.470
-
-**spatialreg::LR.sarlm(sdm,se.SLX.model)**
-
-Likelihood ratio for spatial linear models
-
-data:
-Likelihood ratio = 25.934, df = 1, p-value = 3.533e-07
-sample estimates:
-  Log likelihood of sdm Log likelihood of se.SLX.model
-      -4559.667                      -4572.634
+```{r SDM v SLX, echo=TRUE, message=FALSE, warning=FALSE}
+spatialreg::LR.sarlm(sdm,se.SLX.model)
+```
 
 <p align="center">
 ![Plot Example](plot.png "Plot Example")
 </p>
 
-## Morans and Local Indicators of Spatial Association (LISA)
+### Morans and Local Indicators of Spatial Association (LISA)
 
 ```{r LISA, message=FALSE, warning=FALSE, fig.height = 6, fig.width = 8}
 mc.morans <- spdep::moran.mc(se.data$child.pov.2016, county.k1.neighbors, nsim = 99)
@@ -564,3 +507,18 @@ lisa <- lisa.data %>% fortify()
 <p align = "center">
 ![LISA Example](LISA.png "LISA Example")
 </p>
+
+## Spatial Durbin Error Model
+
+```{r SDEM, echo=TRUE, message=FALSE, warning=FALSE}
+sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
+summary(sdem, Nagelkerke = TRUE)
+```
+
+### SDEM Impacts Table
+```{r SDEM Impacts Table, echo=TRUE, message=FALSE, warning=FALSE}
+sdem.impacts <- summary(spatialreg::impacts(sdem, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
+sdem.impacts
+```
+
+

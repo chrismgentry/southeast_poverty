@@ -146,7 +146,7 @@ summary(ols)
 #Morans Test
 cont.morans <- lm.morantest(ols, se.neighbors.list)
 cont.morans #did not produce significant results
-dist.morans <- lm.morantest(ols, county.k1.neighbors)
+dist.morans <- spdep::lm.morantest(ols, county.k1.neighbors)
 dist.morans
 
 #LaGrange Multiplier
@@ -551,11 +551,12 @@ satl.sdm <- spatialreg::lagsarlm(equation, satl.data, satl.k1.neighbors, type = 
 satl.sdm.summary <- summary(satl.sdm, Nagelkerke = TRUE)
 wsc.sdm <- spatialreg::lagsarlm(equation, wsc.data, wsc.k1.neighbors, type = "mixed")
 wsc.sdm.summary <- summary(wsc.sdm, Nagelkerke = TRUE)
-#sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
+sdm.impacts <- summary(spatialreg::impacts(sdm, listw = county.k1.neighbors, R = 100), zstats = TRUE)#[["pzmat"]]
+sdm.impacts
 
-#sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
-#summary(sdem, Nagelkerke = TRUE)
-#summary(spatialreg::impacts(sdem, listw = county.k1.neighbors, R = 100), zstats = TRUE)[["pzmat"]]
+sdem <- spatialreg::errorsarlm(equation, se.data, county.k1.neighbors, etype = "emixed")
+summary(sdem, Nagelkerke = TRUE)
+
 
 #Simplifying Nested Models
 spatialreg::LR.sarlm(sdm,se.ols)
@@ -566,4 +567,4 @@ spatialreg::LR.sarlm(sdem,se.ols)
 spatialreg::LR.sarlm(sdem,se.SLX.model)
 spatialreg::LR.sarlm(sdem,dist.err.model)
 
-spatialreg::Hausman.test(dist.err.model)
+spatialreg::Hausman.test(sdem)
